@@ -62,7 +62,8 @@ def process(model: HDemucs,
     n = int(np.ceil((orig_len - overlap) / (duration - overlap)))
     audio = np.pad(audio, [(0, n * (duration - overlap) + overlap - orig_len), (0, 0)])
     stems = GetData(model)["sources"]
-    new_audio = np.zeros((len(stems)+1, 2, audio.shape[0]))
+    new_audio = np.zeros((len(stems), 2, audio.shape[0]))
+    total = np.zeros(audio.shape[0])
     print("Total splits of '%s' : %d" % (str(infile), n))
     print(time.time())
     for i in range(n):
@@ -72,13 +73,14 @@ def process(model: HDemucs,
         result = Apply(model, torch.from_numpy(audio[l:r].transpose()).to(device), shifts=shifts)
         for (i, stem) in enumerate(stems):
             new_audio[i, :, l:r] += result[stem].cpu().numpy()
-        new_audio[-1][l:r] += 1
+        total[l:r] += 1
     print(time.time())
     if write:
         outpath.mkdir(exist_ok=True)
         os.chdir(outpath)
         for i in range(len(stems)):
-            print((new_audio[i] / new_audio[-1])[:orig_len].shape, torch.from_numpy((new_audio[i] / new_audio[-1])[:orig_len]).shape)
-            torchaudio.save(f'{stems[i]}.wav', torch.from_numpy((new_audio[i] / new_audio[-1])[:orig_len]), sample_rate)
+            stem = (new_audio[i] / total)[:orig_len]
+            #print((new_audio[i] / total)[:orig_len].shape, torch.from_numpy((new_audio[i] / total)[:orig_len]).shape)
+            torchaudio.save(f'{stems[i]}.wav', torch.from_numpy(stem), sample_rate)
     else:
         pass
