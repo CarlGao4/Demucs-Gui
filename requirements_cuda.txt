@@ -1,0 +1,12 @@
+# Please install torch with cuda manually before installing this! 
+
+dora-search
+diffq>=0.2.1
+julius>=0.2.3
+lameenc>=1.2
+openunmix
+pyyaml
+demucs
+Pillow
+pySoundfile
+pynvml
