@@ -1,0 +1,10 @@
+dora-search
+diffq>=0.2.1
+julius>=0.2.3
+lameenc>=1.2
+openunmix
+pyyaml
+torch>=1.8.1
+torchaudio>=0.8
+Pillow
+pySoundfile
