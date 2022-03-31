@@ -36,7 +36,8 @@ pip install -r requirements.txt
 # For conda
 conda install --yes --file requirements.txt
 ```
-2. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! 
+2. Download [pretrained]() models and extract it to GUI folder.  
+3. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! 
 
 ### CUDA acceleration
 1. Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally)
@@ -47,7 +48,8 @@ pip install -r requirements.txt
 # For conda
 conda install --yes --file requirements.txt
 ```
-3. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem. 
+3. Download [pretrained]() models and extract it to GUI folder.  
+4. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem. 
 
 ## Acknowledgements
 This project includes code of [Demucs](https://github.com/facebookresearch/demucs) under MIT license. 
