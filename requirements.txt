@@ -6,6 +6,6 @@ openunmix
 pyyaml
 torch>=1.8.1
 torchaudio>=0.8
-demucs
-Pillow
+demucs>=3.0.1
+Pillow>=8.0.0
 pySoundfile
