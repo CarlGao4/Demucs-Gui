@@ -36,7 +36,7 @@ pip install -r requirements.txt
 # For conda
 conda install --yes --file requirements.txt
 ```
-2. Download [pretrained]() models and extract it to GUI folder.  
+2. Download [pretrained](https://app.box.com/s/rd6h9dilocrrfbsh8u4izgbpnq4w9dnj) models and extract it to `pretrained` folder under `GUI` folder.  
 3. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! 
 
 ### CUDA acceleration
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 # For conda
 conda install --yes --file requirements.txt
 ```
-3. Download [pretrained]() models and extract it to GUI folder.  
+3. Download [pretrained](https://app.box.com/s/rd6h9dilocrrfbsh8u4izgbpnq4w9dnj) models and extract it to `pretrained` folder under `GUI` folder.  
 4. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem. 
 
 ## Acknowledgements
