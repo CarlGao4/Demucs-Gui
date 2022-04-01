@@ -8,4 +8,5 @@ torch>=1.8.1
 torchaudio>=0.8
 demucs>=3.0.1
 Pillow>=8.0.0
+psutil>=5.7.0
 pySoundfile
