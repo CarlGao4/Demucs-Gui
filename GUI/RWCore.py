@@ -1,4 +1,4 @@
-# Demucs-GUI 0.1a1
+# Demucs-GUI 0.1a2
 # Copyright (C) 2022  Carl Gao, Jize Guo, Rosario S.E.
 
 # This program is free software: you can redistribute it and/or modify
@@ -22,10 +22,13 @@ import os
 import _thread
 from DemucsCallCore import *
 
+
 def convert_audio(wav, from_samplerate, to_samplerate, channels):
     """Convert audio from a given samplerate to a target one and target number of channels."""
     wav = convert_audio_channels(wav, channels)
     return julius.resample_frac(wav, from_samplerate, to_samplerate)
+
+
 def convert_audio_channels(wav, channels=2):
     """Convert audio to the given number of channels."""
     *shape, src_channels, length = wav.shape
@@ -48,13 +51,16 @@ def convert_audio_channels(wav, channels=2):
         wav = wav[..., :channels, :]
     else:
         # Case 4: What is a reasonable choice here?
-        raise ValueError('The audio file has less channels than requested but is not mono.')
+        raise ValueError("The audio file has less channels than requested but is not mono.")
     return wav
+
 
 def load_audio(fn, sr):
     audio, raw_sr = torchaudio.load(fn)
     audio.to("cpu")
     return convert_audio(audio, raw_sr, sr, 2).numpy().transpose()
+
+
 def i16_pcm(wav):
     """Convert audio to 16 bits integer PCM format."""
     if wav.dtype.is_floating_point:
@@ -62,34 +68,38 @@ def i16_pcm(wav):
     else:
         return wav
 
-def process(model: HDemucs,
-            infile: pathlib.Path,
-            write: bool = True,
-            outpath: pathlib.Path = pathlib.Path(""),
-            split: float = 10.,
-            overlap: float = 0.25,
-            sample_rate: int = 44100,
-            shifts: int = 1,
-            device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu",
-            callback = None):
+
+def process(
+    model: HDemucs,
+    infile: pathlib.Path,
+    write: bool = True,
+    outpath: pathlib.Path = pathlib.Path(""),
+    split: float = 10.0,
+    overlap: float = 0.25,
+    sample_rate: int = 44100,
+    shifts: int = 1,
+    device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu",
+    callback=None,
+):
     def call(status):
         if callable(callback):
-            _thread.start_new_thread(callback, (status, ))
+            _thread.start_new_thread(callback, (status,))
+
     split = int(split * sample_rate)
     overlap = int(overlap * split)
-    call('Loading file')
+    call("Loading file")
     audio = load_audio(str(infile), sample_rate)
     orig_len = audio.shape[0]
     n = int(np.ceil((orig_len - overlap) / (split - overlap)))
     audio = np.pad(audio, [(0, n * (split - overlap) + overlap - orig_len), (0, 0)])
-    call('Loading model to device %s' % device)
+    call("Loading model to device %s" % device)
     model.to(device)
     stems = GetData(model)["sources"]
     new_audio = np.zeros((len(stems), 2, audio.shape[0]))
     total = np.zeros(audio.shape[0])
     call("Total splits of '%s' : %d" % (str(infile), n))
     for i in range(n):
-        call("Separation %d/%d" % (i+1, n))
+        call("Separation %d/%d" % (i + 1, n))
         l = i * (split - overlap)
         r = l + split
         result = Apply(model, torch.from_numpy(audio[l:r].transpose()).to(device), shifts=shifts)
@@ -102,7 +112,14 @@ def process(model: HDemucs,
         os.chdir(outpath)
         for i in range(len(stems)):
             stem = (new_audio[i] / total)[:orig_len]
-            torchaudio.save(f'{stems[i]}.wav', i16_pcm(torch.from_numpy(stem)), sample_rate)
+            torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
     else:
         pass
 
+
+torch.cuda.empty_cache()
+if __name__ == "__main__":
+    print("Started")
+    model = GetModel(device="cuda", repo=pathlib.Path(__file__).parent / "pretrained")
+    print("Model Loaded")
+    process(model, pathlib.Path(r"C:\TempUse\如愿.wav"), outpath=pathlib.Path(r"C:\TempUse\如愿"), split=16)
