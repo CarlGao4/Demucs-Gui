@@ -29,7 +29,7 @@ Versions in *italic* means that this is a beta version, which does not provide p
 *This part is written for beta versions*
 
 ### CPU only
-1. Run `pip`, `conda` or other package managers to install all packages in [requirements.txt](requirements.txt). 
+1. Run `pip`, `conda` or other package managers to install all packages in [requirements.txt](requirements.txt). If you are using 0.1a1, please manually add `psutil>=5.7.0` into `requirements.txt`, please add it manually before installing dependencies, because I forgot to add it. 
 ```bash
 # For pip
 pip install -r requirements.txt
@@ -41,7 +41,7 @@ conda install --yes --file requirements.txt
 
 ### CUDA acceleration
 1. Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally)
-2. Run `pip`, `conda` or other package managers to install all packages in [requirements_cuda.txt](requirements_cuda.txt). 
+2. Run `pip`, `conda` or other package managers to install all packages in [requirements_cuda.txt](requirements_cuda.txt). If you are using 0.1a1, please manually add `psutil>=5.7.0` into `requirements_cuda.txt`, please add it manually before installing dependencies, because I forgot to add it. 
 ```bash
 # For pip
 pip install -r requirements.txt
