@@ -115,11 +115,3 @@ def process(
             torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
     else:
         pass
-
-
-torch.cuda.empty_cache()
-if __name__ == "__main__":
-    print("Started")
-    model = GetModel(device="cuda", repo=pathlib.Path(__file__).parent / "pretrained")
-    print("Model Loaded")
-    process(model, pathlib.Path(r"C:\TempUse\如愿.wav"), outpath=pathlib.Path(r"C:\TempUse\如愿"), split=16)
