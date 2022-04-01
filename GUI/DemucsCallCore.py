@@ -1,4 +1,4 @@
-# Demucs-GUI 0.1a1
+# Demucs-GUI 0.1a2
 # Copyright (C) 2022  Carl Gao, Jize Guo, Rosario S.E.
 
 # This program is free software: you can redistribute it and/or modify
@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import demucs
 from demucs.pretrained import get_model as _gm
 from demucs.hdemucs import HDemucs
 from demucs.apply import BagOfModels, apply_model
@@ -22,8 +23,11 @@ import torch
 from typing import Literal
 
 
-def GetModel(name: str = "mdx_extra_q", repo: pathlib.Path = None,
-             device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu") -> HDemucs:
+def GetModel(
+    name: str = "mdx_extra_q",
+    repo: pathlib.Path = None,
+    device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu",
+) -> HDemucs:
     model = _gm(name=name, repo=repo)
     model.to(device)
     model.eval()
@@ -46,10 +50,11 @@ def GetData(model: HDemucs):
     return res
 
 
-def Apply(model: HDemucs,
-          wav: torch.Tensor,
-          shifts: int = 1,
-          ) -> dict:
+def Apply(
+    model: HDemucs,
+    wav: torch.Tensor,
+    shifts: int = 1,
+) -> dict:
     #   device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu") -> dict:
     audio = wav
     # audio.to(device)
