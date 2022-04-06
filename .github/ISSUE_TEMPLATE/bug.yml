@@ -6,17 +6,6 @@ body:
 - type: markdown
   attributes:
     value: "Thanks for your completing this bug report form. "
-- type: dropdown
-  id: platform
-  attrbutes:
-    label: What platform you are using? 
-    options:
-     - Windows
-     - macOS
-     - Linux
-     - Other
-   validations:
-     required: true
 - type: textarea
   id: happen
   attributes:
