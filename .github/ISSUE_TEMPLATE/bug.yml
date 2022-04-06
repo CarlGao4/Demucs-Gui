@@ -3,29 +3,29 @@ description: Report a bug
 title: "Bug: "
 labels: ["bug"]
 body:
-  - type: markdown
-    value: "Thanks for taking the time to fill out this bug report. "
-  - type: dropdown
-    id: platform
-    attrbutes:
-      label: What platform you are using? 
-      options:
-       - Windows
-       - macOS
-       - Linux
-       - Other
-     validations:
-       required: true
-  - type: textarea
-    id: happen
-    attributes:
-      description: "How does this bug happened? "
-      value: |
-        1. 
-        2. 
-    validations: 
-      required: true
-  - type: textarea
-    id: log
-    attributes:
-      description: "Please paste your logs here. To find the logs, please click the menu. "
+- type: markdown
+  value: "Thanks for taking the time to fill out this bug report. "
+- type: dropdown
+  id: platform
+  attrbutes:
+    label: What platform you are using? 
+    options:
+     - Windows
+     - macOS
+     - Linux
+     - Other
+   validations:
+     required: true
+- type: textarea
+  id: happen
+  attributes:
+    description: "How does this bug happened? "
+    value: |
+      1. 
+      2. 
+  validations: 
+    required: true
+- type: textarea
+  id: log
+  attributes:
+    description: "Please paste your logs here. To find the logs, please click the menu. "
