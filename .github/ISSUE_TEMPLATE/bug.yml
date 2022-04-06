@@ -16,6 +16,17 @@ body:
       2. 
   validations: 
     required: true
+- type: dropdown
+  id: platform
+  attrbutes:
+    label: What platform you are using? 
+    options:
+     - Windows
+     - macOS
+     - Linux
+     - Other
+   validations:
+     required: true
 - type: textarea
   id: log
   attributes:
