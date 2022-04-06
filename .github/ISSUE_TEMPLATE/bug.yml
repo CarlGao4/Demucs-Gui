@@ -21,12 +21,13 @@ body:
   attrbutes:
     label: What platform you are using? 
     options:
-     - Windows
-     - macOS
-     - Linux
-     - Other
-   validations:
-     required: true
+    - Windows
+    - macOS
+    - Linux
+    - Other
+    multiple: true
+  validations:
+    required: true
 - type: textarea
   id: log
   attributes:
