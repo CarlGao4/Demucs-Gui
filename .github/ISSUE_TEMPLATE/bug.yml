@@ -1,8 +1,10 @@
-name: Bug Report
-description: Report a bug
+name: "Bug Report"
+description: "Report a bug"
 title: "Bug: (the bug you found)"
 labels: ["bug"]
 body:
+- type: markdown
+  value: "Thanks for your completing this bug report form. "
 - type: dropdown
   id: platform
   attrbutes:
