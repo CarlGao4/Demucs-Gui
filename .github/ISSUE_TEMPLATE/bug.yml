@@ -10,6 +10,7 @@ body:
   id: happen
   attributes:
     description: "How does this bug happened? "
+    label: happen
     value: |
       1. 
       2. 
@@ -19,3 +20,4 @@ body:
   id: log
   attributes:
     description: "Please paste your logs here. To find the logs, please click the menu. "
+    label: log
