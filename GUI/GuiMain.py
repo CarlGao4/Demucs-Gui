@@ -40,6 +40,7 @@ import subprocess
 import re
 import soundfile
 import logging
+import datetime
 from LoadingImgB85 import LoadingImgB85
 
 homeDir = pathlib.Path(__file__).parent
@@ -246,6 +247,21 @@ def Start():
     w.after(0, UpdateUsage)
 
 
+def OpenLog():
+    try:
+        if sys.platform == "win32":
+            subprocess.run('explorer "%s"' % str(logfile))
+        elif sys.platform == "darwin":
+            subprocess.run('open "%s"' % str(logfile))
+        elif sys.platform == "linux":
+            subprocess.run('xdg-open "%s"' % str(logfile))
+        else:
+            tkinter.messagebox.showinfo("Log file", "Cannot detect your system. Please manually open folder: \n%s" % str(logfile))
+    except:
+        logging.error("Failed to open log folder: %s" % traceback.format_exc())
+        tkinter.messagebox.showinfo("Log file", "Failed to open folder. Please manually open folder: \n%s" % str(logfile))
+
+
 def ChooseSeparate():
     if sys.platform == "win32":
         types = soundfile.available_formats()
@@ -333,14 +349,15 @@ if __name__ == "__main__":
         logfile.mkdir(exist_ok=True)
         logfile = logfile / "log"
         logfile.mkdir(exist_ok=True)
+        log = open(str(logfile / datetime.datetime().now().strftime("demucs_gui_log_%Y%m%d_%H%M%S.log")), mode="at")
+        handler = logging.FileHandler(log)
         logging.basicConfig(
-            filename=str(logfile / "log.log"),
+            handlers=[handler],
             format="%(asctime)s (%(filename)s) (Line %(lineno)d) [%(levelname)s] : %(message)s",
             level=logging.DEBUG,
         )
         stderr_old = sys.stderr
-        exceptlog = open(str(logfile / "exception.log"), mode="at")
-        sys.stderr = exceptlog
+        sys.stderr = log
     except:
         LoadingW.attributes("-topmost", False)
         tkinter.messagebox.showerror("Failed to initialize", "Failed to initialize log file. ")
@@ -451,8 +468,12 @@ if __name__ == "__main__":
     Menu = tkinter.Menu(w, tearoff=False)
     InfoMenu = tkinter.Menu(Menu, tearoff=False)
     InfoMenu.add_command(
+        label="Open logfile",
+        command=lambda: _thread.start_new_thread(OpenLog, ())
+    )
+    InfoMenu.add_command(
         label="About Demucs-GUI",
-        command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a1", LICENSE),
+        command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a1", LICENSE)
     )
     Menu.add_cascade(label="Info", menu=InfoMenu)
     w.config(menu=Menu)
