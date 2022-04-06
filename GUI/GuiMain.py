@@ -349,8 +349,8 @@ if __name__ == "__main__":
         logfile.mkdir(exist_ok=True)
         logfile = logfile / "log"
         logfile.mkdir(exist_ok=True)
-        log = open(str(logfile / datetime.datetime().now().strftime("demucs_gui_log_%Y%m%d_%H%M%S.log")), mode="at")
-        handler = logging.FileHandler(log)
+        log = open(str(logfile / datetime.datetime.now().strftime("demucs_gui_log_%Y%m%d_%H%M%S.log")), mode="at")
+        handler = logging.StreamHandler(log)
         logging.basicConfig(
             handlers=[handler],
             format="%(asctime)s (%(filename)s) (Line %(lineno)d) [%(levelname)s] : %(message)s",
@@ -473,7 +473,7 @@ if __name__ == "__main__":
     )
     InfoMenu.add_command(
         label="About Demucs-GUI",
-        command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a1", LICENSE)
+        command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a2", LICENSE)
     )
     Menu.add_cascade(label="Info", menu=InfoMenu)
     w.config(menu=Menu)
