@@ -4,10 +4,7 @@ title: "Bug: "
 labels: ["bug"]
 body:
   - type: markdown
-    attributes:
-      value: |
-        Thanks for taking the time to fill out this bug report. 
-
+    value: "Thanks for taking the time to fill out this bug report. "
   - type: dropdown
     id: platform
     attrbutes:
@@ -19,7 +16,6 @@ body:
        - Other
      validations:
        required: true
-
   - type: textarea
     id: happen
     attributes:
@@ -29,9 +25,7 @@ body:
         2. 
     validations: 
       required: true
-
   - type: textarea
     id: log
     attributes:
       description: "Please paste your logs here. To find the logs, please click the menu. "
- 
