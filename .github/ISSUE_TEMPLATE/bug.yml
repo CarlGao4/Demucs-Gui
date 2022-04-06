@@ -18,14 +18,14 @@ body:
     required: true
 - type: dropdown
   id: platform
-  attrbutes:
-    label: What platform you are using? 
-    options:
-    - Windows
-    - macOS
-    - Linux
-    - Other
-    multiple: true
+  label: platform
+  description: "What is the platform you are using? "
+  options:
+  - Windows
+  - macOS
+  - Linux
+  - Other
+  multiple: true
   validations:
     required: true
 - type: textarea
