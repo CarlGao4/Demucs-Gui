@@ -7,15 +7,28 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report. 
+  - type: dropdown
+    id: platform
+    attrbutes:
+      label: What platform you are using? 
+      options:
+       - Windows
+       - macOS
+       - Linux
+       - Other
+     validations:
+       required: true
   - type: textarea
     id: happen
-    description: "How does this bug happens? "
-    value: |
-      1. 
-      2. 
+    attributes:
+      description: "How does this bug happened? "
+      value: |
+        1. 
+        2. 
     validations: 
       required: true
   - type: textarea
     id: log
-    description: "Please paste your logs here. To find the logs, please click the menu. "
+    attributes:
+      description: "Please paste your logs here. To find the logs, please click the menu. "
  
