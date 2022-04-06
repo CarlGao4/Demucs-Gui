@@ -18,9 +18,8 @@ body:
     required: true
 - type: dropdown
   id: platform
-  description: "What is the platform you are using? "
   attributes:
-    label: platform
+    label: What is the platform you are using?
     options:
     - Windows
     - macOS
