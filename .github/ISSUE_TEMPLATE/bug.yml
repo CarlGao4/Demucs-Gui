@@ -31,5 +31,5 @@ body:
 - type: textarea
   id: log
   attributes:
-    description: "Please paste your logs here. To find the logs, please click the menu. "
+    description: "Please paste your logs here. To find the logs, please click the menu in demucs-GUI window. You can attach the file here. "
     label: log
