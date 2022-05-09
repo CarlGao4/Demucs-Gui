@@ -342,7 +342,7 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             logfile = pathlib.Path(os.environ["APPDATA"])
         elif sys.platform == "darwin" or sys.platform == "linux":
-            logfile = pathlib.Path("~")
+            logfile = pathlib.Path.home()
         else:
             logfile = homeDir
         logfile = logfile / "demucs-gui"
