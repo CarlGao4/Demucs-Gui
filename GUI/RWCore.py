@@ -17,9 +17,11 @@
 import numpy as np
 import julius
 import torch
-import torchaudio
+import soundfile
 import os
+import io
 import _thread
+import subprocess
 from DemucsCallCore import *
 
 
@@ -56,9 +58,20 @@ def convert_audio_channels(wav, channels=2):
 
 
 def load_audio(fn, sr):
-    audio, raw_sr = torchaudio.load(fn)
-    audio.to("cpu")
-    return convert_audio(audio, raw_sr, sr, 2).numpy().transpose()
+    # audio, raw_sr = torchaudio.load(fn)
+    # audio.to("cpu")
+    # return convert_audio(audio, raw_sr, sr, 2).numpy().transpose()
+    audio, raw_sr = soundfile.read(fn)
+    return convert_audio(torch.from_numpy(audio), raw_sr, sr, 2).numpy().transpose()
+
+
+def load_file_ffmpeg(fn, sr):
+    p = subprocess.Popen(['ffmpeg', '-v', 'warning', '-i', fn, '-map', '0:a:0', '-ar', str(sr), '-ac', '2', '-f', 'wav', '-c:a', 'pcm_f32le', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    b = io.BytesIO(p.stdout.read())
+    p.stdout.close()
+    if p.returncode != 0:
+        return (p.stderr.read(), )
+    return(p.stderr.read(), soundfile.read(b))
 
 
 def i16_pcm(wav):
@@ -112,6 +125,7 @@ def process(
         os.chdir(outpath)
         for i in range(len(stems)):
             stem = (new_audio[i] / total)[:orig_len]
-            torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
+            # torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
+            soundfile.write(f"{stems[i]}.wav", stem, sample_rate, subtype='PCM_16')
     else:
         pass
