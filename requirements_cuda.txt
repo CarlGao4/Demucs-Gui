@@ -9,5 +9,5 @@ pyyaml
 demucs>=3.0.1
 psutil>=5.7.0
 Pillow>=8.0.0
-pySoundfile
+pySoundfile>=0.9.0
 pyperclip
