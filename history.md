@@ -6,6 +6,7 @@ Release date: May. 10, 2022
 #### Updates
 1. Added logging so it will be friendlier to debugging
 2. Removed requirement for pynvml and torchaudio
+3. Thanks @hanton2222 , so logging for macOS could be initialized (#8)
 
 #### Known issues
 1. Since the problem of shifts (#6), shifts is temporarily removed
