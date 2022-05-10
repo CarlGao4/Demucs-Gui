@@ -1,5 +1,16 @@
 Note: Versions in *italic* means that the release is a beta version. 
 
+### *0.1a2*
+Release date: May. 10, 2022
+
+#### Updates
+1. Added logging so it will be friendlier to debugging
+2. Removed requirement for pynvml and torchaudio
+
+#### Known issues
+1. Since the problem of shifts (#6), shifts is temporarily removed
+2. FFMpeg is still not available
+
 ### *0.1a1*
 Release date: Mar. 31, 2022
 
