@@ -55,9 +55,7 @@ def Apply(
     wav: torch.Tensor,
     shifts: int = 1,
 ) -> dict:
-    #   device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu") -> dict:
     audio = wav
-    # audio.to(device)
     ref = audio.mean(0)
     audio = (audio - ref.mean()) / ref.std()
     sources = apply_model(model, audio[None], shifts=shifts, split=False, overlap=0.25, progress=False)[0]
