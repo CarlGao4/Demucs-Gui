@@ -19,6 +19,7 @@ __version__ = "0.1a2"
 import time
 
 st = time.time()
+import datetime
 import tkinter
 import tkinter.ttk
 import tkinter.filedialog
@@ -37,10 +38,10 @@ import _thread
 import psutil
 import platform
 import subprocess
+import pyperclip
 import re
 import soundfile
 import logging
-import datetime
 from LoadingImgB85 import LoadingImgB85
 
 homeDir = pathlib.Path(__file__).parent
@@ -160,8 +161,15 @@ def Start():
         raise SystemExit(1)
     logging.info("Loading core")
     global RWCore, torch
-    import RWCore
-    import torch
+    try:
+        import RWCore
+        import torch
+    except:
+        LoadingW.attributes("-topmost", False)
+        tkinter.messagebox.showwarning(
+            "Failed to initialize", "Please check log file at %s for more information. " % str(logfile)
+        )
+        raise SystemExit(1)
 
     logging.info("Core loaded")
     logging.info("Torch version: %s" % torch.__version__)
@@ -201,12 +209,6 @@ def Start():
             logging.info("Default using CUDA %d", cudaID + 1)
             UseCPU = False
         LoadingT.config(text="CUDA is available")
-        global pynvml
-        import pynvml
-
-        pynvml.nvmlInit()
-        global handle
-        handle = pynvml.nvmlDeviceGetHandleByIndex(cudaID)
     else:
         logging.info("CUDA is not available")
         LoadingT.config(text="CUDA is not available")
@@ -238,28 +240,12 @@ def Start():
             logging.info("FFMpeg is not available")
             LoadingT.config(text="FFMpeg is not available")
     time.sleep(0.8)
-    RWCore.torchaudio.set_audio_backend("soundfile")
     LoadingW.destroy()
     SetStatusText("Started in %.3fs" % (time.time() - st - 1.6))
     w.deiconify()
     w.minsize(w.winfo_width() + 20, w.winfo_height() + 20)
     w.focus_force()
     w.after(0, UpdateUsage)
-
-
-def OpenLog():
-    try:
-        if sys.platform == "win32":
-            subprocess.run('explorer "%s"' % str(logfile))
-        elif sys.platform == "darwin":
-            subprocess.run('open "%s"' % str(logfile))
-        elif sys.platform == "linux":
-            subprocess.run('xdg-open "%s"' % str(logfile))
-        else:
-            tkinter.messagebox.showinfo("Log file", "Cannot detect your system. Please manually open folder: \n%s" % str(logfile))
-    except:
-        logging.error("Failed to open log folder: %s" % traceback.format_exc())
-        tkinter.messagebox.showinfo("Log file", "Failed to open folder. Please manually open folder: \n%s" % str(logfile))
 
 
 def ChooseSeparate():
@@ -349,19 +335,30 @@ if __name__ == "__main__":
         logfile.mkdir(exist_ok=True)
         logfile = logfile / "log"
         logfile.mkdir(exist_ok=True)
-        log = open(str(logfile / datetime.datetime.now().strftime("demucs_gui_log_%Y%m%d_%H%M%S.log")), mode="at")
+        filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_demucs_gui_log.log")
+        log = open(str(logfile / filename), mode="at")
+        stderr_old = sys.stderr
+        sys.stderr = log
         handler = logging.StreamHandler(log)
         logging.basicConfig(
             handlers=[handler],
             format="%(asctime)s (%(filename)s) (Line %(lineno)d) [%(levelname)s] : %(message)s",
             level=logging.DEBUG,
         )
-        stderr_old = sys.stderr
-        sys.stderr = log
     except:
+        print(traceback.format_exc())
         LoadingW.attributes("-topmost", False)
         tkinter.messagebox.showerror("Failed to initialize", "Failed to initialize log file. ")
         raise SystemExit(1)
+
+    def OpenLog():
+        if sys.platform == "win32":
+            subprocess.run(["cmd", "/c", "explorer", str(logfile)])
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(logfile)])
+        else:
+            if tkinter.messagebox.askyesno("Demucs-GUI Log", "Do you want to copy log directory to your clipboard? "):
+                pyperclip.copy(logfile)
 
     StatusBar = tkinter.Frame(w)
     StatusText = tkinter.Label(StatusBar)
@@ -374,33 +371,29 @@ if __name__ == "__main__":
     UsageInfo.pack(side=tkinter.RIGHT, fill=tkinter.Y)
 
     def UpdateUsage():
-        global handle, cudaID, LastCudaID, LastDevice, UseCPU, model
+        global cudaID, LastCudaID, LastDevice, UseCPU, model
         m = proc.memory_info()
         try:
             if sys.platform == "win32":
                 UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB GPUMEM:%dMB GPU%d:%d%%"
+                    text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB GPUMEM:%dMB"
                     % (
                         (m.rss) // 1048576,
                         (m.vms - m.rss) // 1048576,
                         proc.cpu_percent(0) // psutil.cpu_count(True),
                         psutil.virtual_memory().total // 1048576,
-                        pynvml.nvmlDeviceGetMemoryInfo(handle).used // 1048576,
-                        cudaID,
-                        pynvml.nvmlDeviceGetUtilizationRates(handle).gpu,
+                        torch.cuda.memory_reserved() // 1048576,
                     )
                 )
             else:
                 UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB GPUMEM:%dMB GPU%d:%d%%"
+                    text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB GPUMEM:%dMB"
                     % (
                         m.rss // 1048576,
                         m.vms // 1058476,
                         proc.cpu_percent() // psutil.cpu_count(True),
                         psutil.virtual_memory().total // 1048576,
-                        pynvml.nvmlDeviceGetMemoryInfo(handle).used // 1048576,
-                        cudaID,
-                        pynvml.nvmlDeviceGetUtilizationRates(handle).gpu,
+                        torch.cuda.memory_reserved() // 1048576,
                     )
                 )
         except:
@@ -459,7 +452,6 @@ if __name__ == "__main__":
                 except:
                     pass
         if LastCudaID != cudaID:
-            handle = pynvml.nvmlDeviceGetHandleByIndex(cudaID)
             LastCudaID = cudaID
         w.after(200, UpdateUsage)
 
@@ -467,13 +459,9 @@ if __name__ == "__main__":
 
     Menu = tkinter.Menu(w, tearoff=False)
     InfoMenu = tkinter.Menu(Menu, tearoff=False)
+    InfoMenu.add_command(label="Open Log", command=OpenLog)
     InfoMenu.add_command(
-        label="Open logfile",
-        command=lambda: _thread.start_new_thread(OpenLog, ())
-    )
-    InfoMenu.add_command(
-        label="About Demucs-GUI",
-        command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a2", LICENSE)
+        label="About Demucs-GUI", command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a1", LICENSE)
     )
     Menu.add_cascade(label="Info", menu=InfoMenu)
     w.config(menu=Menu)
@@ -525,11 +513,11 @@ if __name__ == "__main__":
     POE = tkinter.ttk.Spinbox(PLF, from_=0, to=0.9, increment=0.01, width=5, state="readonly")
     PHE = tkinter.ttk.Spinbox(PLF, from_=0, to=20, increment=1, width=5, state="readonly")
     PPL.grid(column=0, row=0, padx=(20, 0), pady=(10, 0), sticky=tkinter.W)
-    POL.grid(column=0, row=1, padx=(20, 0), pady=(10, 0), sticky=tkinter.W)
-    PHL.grid(column=0, row=2, padx=(20, 0), pady=(10, 20), sticky=tkinter.W)
+    POL.grid(column=0, row=1, padx=(20, 0), pady=(10, 20), sticky=tkinter.W)
+    # PHL.grid(column=0, row=2, padx=(20, 0), pady=(10, 20), sticky=tkinter.W)
     PPE.grid(column=1, row=0, padx=(5, 20), pady=(10, 0), sticky=tkinter.W)
-    POE.grid(column=1, row=1, padx=(5, 20), pady=(10, 0), sticky=tkinter.W)
-    PHE.grid(column=1, row=2, padx=(5, 20), pady=(10, 20), sticky=tkinter.W)
+    POE.grid(column=1, row=1, padx=(5, 20), pady=(10, 20), sticky=tkinter.W)
+    # PHE.grid(column=1, row=2, padx=(5, 20), pady=(10, 20), sticky=tkinter.W)
 
     FLF = tkinter.ttk.LabelFrame(MainFrame, text="Separate")
     BB = tkinter.ttk.Button(FLF, text="Browse File to Separate", command=ChooseSeparate)
@@ -538,7 +526,3 @@ if __name__ == "__main__":
     LoadingW.after(0, lambda: _thread.start_new_thread(Start, ()))
 
     w.mainloop()
-    try:
-        pynvml.nvmlShutdown()
-    except:
-        pass
