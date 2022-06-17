@@ -1,4 +1,4 @@
-# Demucs-GUI 0.1a2
+# Demucs-GUI 0.1
 # Copyright (C) 2022  Carl Gao, Jize Guo, Rosario S.E.
 
 # This program is free software: you can redistribute it and/or modify
