@@ -1,4 +1,4 @@
-LICENSE = """Demucs-GUI 0.1a2
+LICENSE = """Demucs-GUI 0.1
 Copyright (C) 2022  Carl Gao, Jize Guo, Rosario S.E.
 
 This program is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
-__version__ = "0.1a2"
+__version__ = "0.1"
 
 import time
 
@@ -68,6 +68,23 @@ def HSize(size):
     return str(round(s, 3)) + u[t]
 
 
+def GetDefaultSplitForCUDA():
+    if isinstance(model, RWCore.BagOfModels):
+        DefaultSplit = min(
+            list(i.segment for i in model.models)
+            + [(torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128]
+        )
+        return 6 if DefaultSplit < 6 else DefaultSplit
+    else:
+        DefaultSplit = min(
+            [
+                model.segment,
+                (torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128,
+            ]
+        )
+        return 6 if DefaultSplit < 6 else DefaultSplit
+
+
 def LoadModel():
     global model
     st = time.time()
@@ -117,23 +134,7 @@ def LoadModel():
     FLF.grid(column=1, row=1, padx=(10, 20), pady=(10, 20))
     MH.config(state=tkinter.DISABLED)
     if LastDevice.startswith("CUDA"):
-        DefaultSplit = None
-        if isinstance(model, RWCore.BagOfModels):
-            DefaultSplit = min(
-                list(i.segment for i in model.models)
-                + [(torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128]
-            )
-            DefaultSplit = 6 if DefaultSplit < 6 else DefaultSplit
-            PPE.set(DefaultSplit)
-        else:
-            DefaultSplit = min(
-                [
-                    model.segment,
-                    (torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128,
-                ]
-            )
-            DefaultSplit = 6 if DefaultSplit < 6 else DefaultSplit
-            PPE.set(DefaultSplit)
+        PPE.set(GetDefaultSplitForCUDA())
     else:
         if isinstance(model, RWCore.BagOfModels):
             PPE.set(min(i.segment for i in model.models))
@@ -297,6 +298,41 @@ def Separate(File: pathlib.Path):
     BB.config(state=tkinter.NORMAL)
 
 
+def ShowText(text, title="", font=("Arial", 10), width=64, height=20, WindowModel=True, **kwargs):
+    TextW = tkinter.Toplevel()
+    TextW.title(title)
+    TextW.resizable(False, False)
+    if sys.platform == "win32":
+        TextW.attributes("-toolwindow", 1)
+    TextT = tkinter.Text(TextW, width=width, height=height, font=font, **kwargs)
+    TextScr = tkinter.ttk.Scrollbar(TextW, orient="vertical")
+    TextScr.config(command=TextT.yview)
+    TextT.config(yscrollcommand=TextScr.set)
+    TextT.insert(tkinter.END, text)
+    TextT.config(state=tkinter.DISABLED)
+    if WindowModel:
+        TextW.grab_set()
+    TextT.pack(side=tkinter.LEFT, fill=tkinter.Y)
+    TextScr.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+
+
+def GenerateSystemInfo():
+    info = ""
+    info += "Python version:\t%s\n" % sys.version
+    info += "System:\t%s\n" % platform.platform()
+    info += "CPU:\t%s\n" % platform.processor()
+    info += "Memory:\t%.3fMB\n" % (psutil.virtual_memory().total / 1048576)
+    info += "PyTorch version:\t%s\n" % torch.__version__
+    info += "CUDA available:\t%s\n" % torch.cuda.is_available()
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            info += "    CUDA %d:\t%s\n" % (i, re.findall("\\((.*)\\)", str(torch.cuda.get_device_properties(i)))[0])
+    info += "Demucs version:\t%s\n" % RWCore.demucs.__version__
+    info += "FFMpeg available:\t%s\n" % FFMpegAvailable
+    info += "Demucs-GUI version:\t%s\n" % __version__
+    return info
+
+
 if __name__ == "__main__":
     w = tkinter.Tk()
     LoadingImgTk = PIL.ImageTk.PhotoImage(LoadingImg)
@@ -423,23 +459,7 @@ if __name__ == "__main__":
                 LastCudaID = int(LastDevice[5:])
                 UseCPU = False
                 try:
-                    DefaultSplit = None
-                    if isinstance(model, RWCore.BagOfModels):
-                        DefaultSplit = min(
-                            list(i.segment for i in model.models)
-                            + [(torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128]
-                        )
-                        DefaultSplit = 6 if DefaultSplit < 6 else DefaultSplit
-                        PPE.set(DefaultSplit)
-                    else:
-                        DefaultSplit = min(
-                            [
-                                model.segment,
-                                (torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128,
-                            ]
-                        )
-                        DefaultSplit = 6 if DefaultSplit < 6 else DefaultSplit
-                        PPE.set(DefaultSplit)
+                    PPE.set(GetDefaultSplitForCUDA())
                 except:
                     pass
             else:
@@ -461,13 +481,39 @@ if __name__ == "__main__":
     InfoMenu = tkinter.Menu(Menu, tearoff=False)
     InfoMenu.add_command(label="Open Log", command=OpenLog)
     InfoMenu.add_command(
-        label="About Demucs-GUI", command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1a1", LICENSE)
+        label="System Information",
+        command=lambda: ShowText(
+            GenerateSystemInfo(), "System Information", font=("Courier New", 12), width=80, height=20, tabs=(192, 216)
+        ),
+    )
+    InfoMenu.add_command(
+        label="About Demucs-GUI", command=lambda: tkinter.messagebox.showinfo("Demucs-GUI 0.1", LICENSE)
     )
     Menu.add_cascade(label="Info", menu=InfoMenu)
     w.config(menu=Menu)
 
     MainFrame = tkinter.Frame()
     MainFrame.pack(side=tkinter.TOP, fill=tkinter.X)
+
+    @w.register
+    def ValidateSplit(orin):
+        try:
+            int(orin)
+        except:
+            return False
+        if not 6 <= int(orin) <= 3600:
+            return False
+        return True
+
+    @w.register
+    def ValidateOverlap(orin):
+        try:
+            float(orin)
+        except:
+            return False
+        if not 0.0 <= float(orin) <= 0.9:
+            return False
+        return True
 
     MLF = tkinter.ttk.Labelframe(MainFrame, text="Model")
     ML = tkinter.Label(MLF, text="Model name:")
@@ -509,8 +555,8 @@ if __name__ == "__main__":
     PPL = tkinter.Label(PLF, text="Split:")
     POL = tkinter.Label(PLF, text="Overlap:")
     PHL = tkinter.Label(PLF, text="Shifts:")
-    PPE = tkinter.ttk.Spinbox(PLF, from_=6, to=3600, increment=1, width=5, state="readonly")
-    POE = tkinter.ttk.Spinbox(PLF, from_=0, to=0.9, increment=0.01, width=5, state="readonly")
+    PPE = tkinter.ttk.Spinbox(PLF, from_=6, to=3600, increment=1, width=5)
+    POE = tkinter.ttk.Spinbox(PLF, from_=0, to=0.9, increment=0.01, width=5)
     PHE = tkinter.ttk.Spinbox(PLF, from_=0, to=20, increment=1, width=5, state="readonly")
     PPL.grid(column=0, row=0, padx=(20, 0), pady=(10, 0), sticky=tkinter.W)
     POL.grid(column=0, row=1, padx=(20, 0), pady=(10, 20), sticky=tkinter.W)
@@ -518,6 +564,43 @@ if __name__ == "__main__":
     PPE.grid(column=1, row=0, padx=(5, 20), pady=(10, 0), sticky=tkinter.W)
     POE.grid(column=1, row=1, padx=(5, 20), pady=(10, 20), sticky=tkinter.W)
     # PHE.grid(column=1, row=2, padx=(5, 20), pady=(10, 20), sticky=tkinter.W)
+
+    @w.register
+    def SplitInvalid(orin):
+        try:
+            int(orin)
+        except:
+            if not UseCPU:
+                try:
+                    PPE.set(GetDefaultSplitForCUDA())
+                except:
+                    pass
+            else:
+                try:
+                    if isinstance(model, RWCore.BagOfModels):
+                        PPE.set(min(i.segment for i in model.models))
+                    else:
+                        PPE.set(model.segment)
+                except:
+                    pass
+        if int(orin) < 6:
+            PPE.set(6)
+        elif int(orin) > 3600:
+            PPE.set(3600)
+
+    @w.register
+    def OverlapInvalid(orin):
+        try:
+            float(orin)
+        except:
+            POE.set(0.25)
+        if float(orin) < 0.0:
+            POE.set(0.0)
+        elif float(orin) > 0.9:
+            POE.set(0.9)
+
+    PPE.config(validate="focusout", validatecommand=(ValidateSplit, "%s"), invalidcommand=(SplitInvalid, "%s"))
+    POE.config(validate="focusout", validatecommand=(ValidateOverlap, "%s"), invalidcommand=(OverlapInvalid, "%s"))
 
     FLF = tkinter.ttk.LabelFrame(MainFrame, text="Separate")
     BB = tkinter.ttk.Button(FLF, text="Browse File to Separate", command=ChooseSeparate)
