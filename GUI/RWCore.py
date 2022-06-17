@@ -1,4 +1,4 @@
-# Demucs-GUI 0.1a2
+# Demucs-GUI 0.1
 # Copyright (C) 2022  Carl Gao, Jize Guo, Rosario S.E.
 
 # This program is free software: you can redistribute it and/or modify
@@ -66,12 +66,33 @@ def load_audio(fn, sr):
 
 
 def load_file_ffmpeg(fn, sr):
-    p = subprocess.Popen(['ffmpeg', '-v', 'warning', '-i', fn, '-map', '0:a:0', '-ar', str(sr), '-ac', '2', '-f', 'wav', '-c:a', 'pcm_f32le', '-'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(
+        [
+            "ffmpeg",
+            "-v",
+            "warning",
+            "-i",
+            fn,
+            "-map",
+            "0:a:0",
+            "-ar",
+            str(sr),
+            "-ac",
+            "2",
+            "-f",
+            "wav",
+            "-c:a",
+            "pcm_f32le",
+            "-",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     b = io.BytesIO(p.stdout.read())
     p.stdout.close()
     if p.returncode != 0:
-        return (p.stderr.read(), )
-    return(p.stderr.read(), soundfile.read(b))
+        return (p.stderr.read(),)
+    return (p.stderr.read(), soundfile.read(b))
 
 
 def i16_pcm(wav):
@@ -126,6 +147,6 @@ def process(
         for i in range(len(stems)):
             stem = (new_audio[i] / total)[:orig_len]
             # torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
-            soundfile.write(f"{stems[i]}.wav", stem, sample_rate, subtype='PCM_16')
+            soundfile.write(f"{stems[i]}.wav", stem, sample_rate, subtype="PCM_16")
     else:
         pass
