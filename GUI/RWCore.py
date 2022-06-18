@@ -19,7 +19,10 @@ import julius
 import torch
 import soundfile
 import os
+import logging
+import traceback
 import io
+import wave
 import _thread
 import subprocess
 from DemucsCallCore import *
@@ -58,11 +61,11 @@ def convert_audio_channels(wav, channels=2):
 
 
 def load_audio(fn, sr):
-    # audio, raw_sr = torchaudio.load(fn)
-    # audio.to("cpu")
-    # return convert_audio(audio, raw_sr, sr, 2).numpy().transpose()
-    audio, raw_sr = soundfile.read(fn)
-    return convert_audio(torch.from_numpy(audio), raw_sr, sr, 2).numpy().transpose()
+    audio, raw_sr = soundfile.read(fn, dtype="float32")
+    if len(audio.shape) == 1:
+        audio = np.atleast_2d(audio).transpose()
+    converted = convert_audio(torch.from_numpy(audio.transpose()), raw_sr, sr, 2)
+    return converted.numpy()
 
 
 def load_file_ffmpeg(fn, sr):
@@ -103,6 +106,15 @@ def i16_pcm(wav):
         return wav
 
 
+def write_wav(wav, filename, samplerate):
+    wav = i16_pcm(wav).numpy()
+    with wave.open(filename, "wb") as f:
+        f.setnchannels(wav.shape[1])
+        f.setsampwidth(2)
+        f.setframerate(samplerate)
+        f.writeframes(wav.tobytes())
+
+
 def process(
     model: HDemucs,
     infile: pathlib.Path,
@@ -123,30 +135,36 @@ def process(
     overlap = int(overlap * split)
     call("Loading file")
     audio = load_audio(str(infile), sample_rate)
-    orig_len = audio.shape[0]
+    logging.debug(f"Loaded audio of shape {audio.shape}")
+    orig_len = audio.shape[1]
     n = int(np.ceil((orig_len - overlap) / (split - overlap)))
-    audio = np.pad(audio, [(0, n * (split - overlap) + overlap - orig_len), (0, 0)])
+    audio = np.pad(audio, [(0, 0), (0, n * (split - overlap) + overlap - orig_len)])
     call("Loading model to device %s" % device)
     model.to(device)
     stems = GetData(model)["sources"]
-    new_audio = np.zeros((len(stems), 2, audio.shape[0]))
-    total = np.zeros(audio.shape[0])
+    new_audio = np.zeros((len(stems), 2, audio.shape[1]))
+    total = np.zeros(audio.shape[1])
     call("Total splits of '%s' : %d" % (str(infile), n))
     for i in range(n):
         call("Separation %d/%d" % (i + 1, n))
         l = i * (split - overlap)
         r = l + split
-        result = Apply(model, torch.from_numpy(audio[l:r].transpose()).to(device), shifts=shifts)
-        for (i, stem) in enumerate(stems):
-            new_audio[i, :, l:r] += result[stem].cpu().numpy()
+        result = Apply(model, torch.from_numpy(audio[:, l:r]).to(device))
+        for (j, stem) in enumerate(stems):
+            new_audio[j, :, l:r] += result[stem].cpu().numpy()
         total[l:r] += 1
     if write:
         call("Writing to file")
         outpath.mkdir(exist_ok=True)
-        os.chdir(outpath)
         for i in range(len(stems)):
-            stem = (new_audio[i] / total)[:orig_len]
+            stem = (new_audio[i] / total)[:, :orig_len]
             # torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
-            soundfile.write(f"{stems[i]}.wav", stem, sample_rate, subtype="PCM_16")
+            try:
+                soundfile.write(str(outpath / f"{stems[i]}.wav"), stem, sample_rate, format="WAV", subtype="PCM_16")
+            except:
+                call("Failed to write with soundfile, using wave instead")
+                logging.error(traceback.format_exc())
+                write_wav(torch.from_numpy(stem.transpose()), str(outpath / f"{stems[i]}.wav"), sample_rate)
+
     else:
         pass
