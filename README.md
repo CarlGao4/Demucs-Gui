@@ -23,7 +23,7 @@ At least Python 3.9 is required. Other requirements please refer to [Installing 
 (For more please see [history.md](history.md))
 Versions in *italic* means that this is a beta version, which does not provide packed binaries. 
 - [*0.1a1 (Mar.31, 2022)* Initial release](history.md#01a1)
-- [*0.1a1 (May.10, 2022)*](history.md#01a2)
+- [*0.1a2 (May.10, 2022)*](history.md#01a2)
 
 ## Usage
 **If you are using released binaries, please skip this part**
