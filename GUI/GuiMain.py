@@ -92,14 +92,14 @@ def LoadModel():
     MB.config(state=tkinter.DISABLED)
     MP.config(state=tkinter.DISABLED)
     SetStatusText("Loading model...")
-    if MPV.get() != "":
-        if not os.path.exists(pathlib.Path(MPV.get()) / (MV.get() + ".yaml")):
-            tkinter.messagebox.showerror("Model load failed", "No such model")
-            ME.config(state=tkinter.NORMAL)
-            MB.config(state=tkinter.NORMAL)
-            MP.config(state=tkinter.NORMAL)
-            SetStatusText("Failed to load model")
-            return
+    # if MPV.get() != "":
+    #     if not os.path.exists(pathlib.Path(MPV.get()) / (MV.get() + ".yaml")):
+    #         tkinter.messagebox.showerror("Model load failed", "No such model")
+    #         ME.config(state=tkinter.NORMAL)
+    #         MB.config(state=tkinter.NORMAL)
+    #         MP.config(state=tkinter.NORMAL)
+    #         SetStatusText("Failed to load model")
+    #         return
     try:
         logging.info("Load model (%s) from (%s)" % (MV.get(), MPV.get()))
         model = RWCore.GetModel(
@@ -108,7 +108,7 @@ def LoadModel():
             device="cpu",
         )
     except:
-        print(traceback.format_exc(), file=sys.stderr)
+        logging.error(traceback.format_exc())
         logging.error("Model load failed")
         tkinter.messagebox.showerror(
             "Model load failed", "Please see log at %s to find detail" % str(logfile / "exception.log")
@@ -167,13 +167,16 @@ def Start():
         import torch
     except:
         LoadingW.attributes("-topmost", False)
-        tkinter.messagebox.showwarning(
+        logging.fatal(traceback.format_exc())
+        tkinter.messagebox.showerror(
             "Failed to initialize", "Please check log file at %s for more information. " % str(logfile)
         )
         raise SystemExit(1)
 
     logging.info("Core loaded")
+    logging.info("pySoundFile version: %s" % soundfile.__version__)
     logging.info("Torch version: %s" % torch.__version__)
+    logging.info("NumPy version: %s" % RWCore.np.__version__)
     logging.info("Demucs version: %s" % RWCore.demucs.__version__)
 
     global devices, cudaID, UseCPU
@@ -219,7 +222,7 @@ def Start():
     try:
         p = subprocess.Popen(["ffmpeg", "-version"], stdout=subprocess.PIPE)
     except:
-        print(traceback.format_exc(), file=sys.stderr)
+        logging.error(traceback.format_exc())
         logging.info("FFMpeg is not available")
         LoadingT.config(text="FFMpeg is not available")
     else:
@@ -237,7 +240,7 @@ def Start():
             logging.info(FFout)
             FFMpegAvailable = True
         except:
-            print(traceback.format_exc(), file=sys.stderr)
+            logging.error(traceback.format_exc())
             logging.info("FFMpeg is not available")
             LoadingT.config(text="FFMpeg is not available")
     time.sleep(0.8)
@@ -247,6 +250,7 @@ def Start():
     w.minsize(w.winfo_width() + 20, w.winfo_height() + 20)
     w.focus_force()
     w.after(0, UpdateUsage)
+    w.after(0, LogSystemStatus)
 
 
 def ChooseSeparate():
@@ -255,7 +259,7 @@ def ChooseSeparate():
         types = list((types[i], "*." + i) for i in types)
         types = [("All available types", " ".join(i[1] for i in types))] + types
     file = tkinter.filedialog.askopenfilename(title="Browse an audio", filetypes=types)
-    if file is None:
+    if len(file) == 0:
         return
     logging.info("%s chosen" % file)
     _thread.start_new_thread(Separate, (pathlib.Path(file),))
@@ -287,7 +291,7 @@ def Separate(File: pathlib.Path):
             'If error is out of memory, please use smaller "split", or close programs require a lot of memory (like browser, games, photo&video editor), or use CPU instead\n\n'
             + traceback.format_exc(),
         )
-        print(traceback.format_exc(), file=sys.stderr)
+        logging.error(traceback.format_exc())
     model.to("cpu")
     for _ in range(10):
         torch.cuda.empty_cache()
@@ -323,6 +327,8 @@ def GenerateSystemInfo():
     info += "CPU:\t%s\n" % platform.processor()
     info += "Memory:\t%.3fMB\n" % (psutil.virtual_memory().total / 1048576)
     info += "PyTorch version:\t%s\n" % torch.__version__
+    info += "NumPy version:\t%s\n" % RWCore.np.__version__
+    info += "pySoundFile version:\t%s\n" % soundfile.__version__
     info += "CUDA available:\t%s\n" % torch.cuda.is_available()
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
@@ -331,6 +337,10 @@ def GenerateSystemInfo():
     info += "FFMpeg available:\t%s\n" % FFMpegAvailable
     info += "Demucs-GUI version:\t%s\n" % __version__
     return info
+
+
+def do_nothing(*_, **__):
+    pass
 
 
 if __name__ == "__main__":
@@ -344,7 +354,8 @@ if __name__ == "__main__":
     LoadingW = tkinter.Toplevel(w)
     if sys.platform != "darwin":
         LoadingW.overrideredirect(True)
-    LoadingW.protocol("WM_DELETE_WINDOW", None)
+    LoadingW.protocol("WM_DELETE_WINDOW", do_nothing)
+    LoadingW.bind("<Escape>", w.destroy)
     LoadingW.resizable(False, False)
     LoadingL = tkinter.ttk.Label(LoadingW, border=0)
     LoadingL.config(image=LoadingImgTk)
@@ -402,6 +413,7 @@ if __name__ == "__main__":
 
     def SetStatusText(text):
         StatusText.config(text=text)
+        logging.debug(text)
 
     UsageInfo = tkinter.Label(StatusBar, font=("Courier New", 8))
     UsageInfo.pack(side=tkinter.RIGHT, fill=tkinter.Y)
@@ -409,7 +421,7 @@ if __name__ == "__main__":
     def UpdateUsage():
         global cudaID, LastCudaID, LastDevice, UseCPU, model
         m = proc.memory_info()
-        try:
+        if torch.cuda.is_available():
             if sys.platform == "win32":
                 UsageInfo.config(
                     text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB GPUMEM:%dMB"
@@ -432,7 +444,7 @@ if __name__ == "__main__":
                         torch.cuda.memory_reserved() // 1048576,
                     )
                 )
-        except:
+        else:
             if sys.platform == "win32":
                 UsageInfo.config(
                     text="MEM:%dMB SWAP:%dMB\nCPU:%d%% ALLMEM:%dMB"
@@ -445,7 +457,7 @@ if __name__ == "__main__":
                 )
             else:
                 UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%%\nALLMEM:%dMB"
+                    text="MEM:%dMB SWAP:%dMB\nCPU:%d%% ALLMEM:%dMB"
                     % (
                         m.rss // 1048576,
                         m.vms // 1058476,
@@ -474,6 +486,55 @@ if __name__ == "__main__":
         if LastCudaID != cudaID:
             LastCudaID = cudaID
         w.after(200, UpdateUsage)
+
+    def LogSystemStatus():
+        global cudaID, UseCPU
+        w.after(1000, LogSystemStatus)
+        m = proc.memory_info()
+        if torch.cuda.is_available():
+            if sys.platform == "win32":
+                logging.debug(
+                    "MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB GPUMEM:%dMB"
+                    % (
+                        (m.rss) // 1048576,
+                        (m.vms - m.rss) // 1048576,
+                        proc.cpu_percent(0) // psutil.cpu_count(True),
+                        psutil.virtual_memory().total // 1048576,
+                        torch.cuda.memory_reserved() // 1048576,
+                    )
+                )
+            else:
+                UsageInfo.config(
+                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB GPUMEM:%dMB"
+                    % (
+                        m.rss // 1048576,
+                        m.vms // 1058476,
+                        proc.cpu_percent() // psutil.cpu_count(True),
+                        psutil.virtual_memory().total // 1048576,
+                        torch.cuda.memory_reserved() // 1048576,
+                    )
+                )
+        else:
+            if sys.platform == "win32":
+                UsageInfo.config(
+                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
+                    % (
+                        (m.rss) // 1048576,
+                        (m.vms - m.rss) // 1048576,
+                        proc.cpu_percent() // psutil.cpu_count(True),
+                        psutil.virtual_memory().total // 1048576,
+                    )
+                )
+            else:
+                UsageInfo.config(
+                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
+                    % (
+                        m.rss // 1048576,
+                        m.vms // 1058476,
+                        proc.cpu_percent() // psutil.cpu_count(True),
+                        psutil.virtual_memory().total // 1048576,
+                    )
+                )
 
     StatusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
 
