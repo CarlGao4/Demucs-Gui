@@ -295,8 +295,8 @@ def Separate(File: pathlib.Path):
     model.to("cpu")
     for _ in range(10):
         torch.cuda.empty_cache()
-    PPE.config(state="readonly")
-    POE.config(state="readonly")
+    PPE.config(state=tkinter.NORMAL)
+    POE.config(state=tkinter.NORMAL)
     PHE.config(state="readonly")
     DM.config(state="readonly")
     BB.config(state=tkinter.NORMAL)
@@ -504,8 +504,8 @@ if __name__ == "__main__":
                     )
                 )
             else:
-                UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB GPUMEM:%dMB"
+                logging.debug(
+                    "MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB GPUMEM:%dMB"
                     % (
                         m.rss // 1048576,
                         m.vms // 1058476,
@@ -516,8 +516,8 @@ if __name__ == "__main__":
                 )
         else:
             if sys.platform == "win32":
-                UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
+                logging.debug(
+                    "MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
                     % (
                         (m.rss) // 1048576,
                         (m.vms - m.rss) // 1048576,
@@ -526,8 +526,8 @@ if __name__ == "__main__":
                     )
                 )
             else:
-                UsageInfo.config(
-                    text="MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
+                logging.debug(
+                    "MEM:%dMB SWAP:%dMB CPU:%d%% ALLMEM:%dMB"
                     % (
                         m.rss // 1048576,
                         m.vms // 1058476,
@@ -660,8 +660,8 @@ if __name__ == "__main__":
         elif float(orin) > 0.9:
             POE.set(0.9)
 
-    PPE.config(validate="focusout", validatecommand=(ValidateSplit, "%s"), invalidcommand=(SplitInvalid, "%s"))
-    POE.config(validate="focusout", validatecommand=(ValidateOverlap, "%s"), invalidcommand=(OverlapInvalid, "%s"))
+    PPE.config(validate="focusout", validatecommand=(ValidateSplit, "%P"), invalidcommand=(SplitInvalid, "%P"))
+    POE.config(validate="focusout", validatecommand=(ValidateOverlap, "%P"), invalidcommand=(OverlapInvalid, "%P"))
 
     FLF = tkinter.ttk.LabelFrame(MainFrame, text="Separate")
     BB = tkinter.ttk.Button(FLF, text="Browse File to Separate", command=ChooseSeparate)
