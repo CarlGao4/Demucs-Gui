@@ -174,10 +174,24 @@ def Start():
         raise SystemExit(1)
 
     logging.info("Core loaded")
-    logging.info("pySoundFile version: %s" % soundfile.__version__)
+    logging.info("SoundFile version: %s" % soundfile.__version__)
+    logging.info("libsndfile version: %s" % soundfile.__libsndfile_version__)
     logging.info("Torch version: %s" % torch.__version__)
     logging.info("NumPy version: %s" % RWCore.np.__version__)
     logging.info("Demucs version: %s" % RWCore.demucs.__version__)
+
+    # Add newer file formats that soundfile 0.10.3 doesn't define
+    if soundfile.__libsndfile_version__ >= "1.0.29":
+        soundfile._formats["OPUS"] = 0x0064
+        soundfile._formats["NMS_ADPCM_16"] = 0x0022
+        soundfile._formats["NMS_ADPCM_24"] = 0x0023
+        soundfile._formats["NMS_ADPCM_32"] = 0x0024
+    if soundfile.__libsndfile_version__ >= "1.1.0":
+        soundfile._formats["MPEG"] = 0x230000
+        soundfile._subtypes["MPEG_LAYER_I"] = 0x0080
+        soundfile._subtypes["MPEG_LAYER_II"] = 0x0081
+        soundfile._subtypes["MPEG_LAYER_III"] = 0x0082
+        soundfile._default_subtypes["MPEG"] = "MPEG_LAYER_III"
 
     global devices, cudaID, UseCPU
     devices = ["CPU - %s (%d MiB)" % (platform.processor(), psutil.virtual_memory().total // 1048576)]
@@ -254,11 +268,7 @@ def Start():
 
 
 def ChooseSeparate():
-    if sys.platform == "win32":
-        types = soundfile.available_formats()
-        types = list((types[i], "*." + i) for i in types)
-        types = [("All available types", " ".join(i[1] for i in types))] + types
-    file = tkinter.filedialog.askopenfilename(title="Browse an audio", filetypes=types)
+    file = tkinter.filedialog.askopenfilename(title="Browse an audio", filetypes=RWCore.types)
     if len(file) == 0:
         return
     logging.info("%s chosen" % file)
@@ -302,7 +312,7 @@ def Separate(File: pathlib.Path):
     BB.config(state=tkinter.NORMAL)
 
 
-def ShowText(text, title="", font=("Arial", 10), width=64, height=20, WindowModel=True, **kwargs):
+def ShowText(text, title="", font=("Arial", 10), width=64, height=20, DoModel=True, **kwargs):
     TextW = tkinter.Toplevel()
     TextW.title(title)
     TextW.resizable(False, False)
@@ -314,7 +324,7 @@ def ShowText(text, title="", font=("Arial", 10), width=64, height=20, WindowMode
     TextT.config(yscrollcommand=TextScr.set)
     TextT.insert(tkinter.END, text)
     TextT.config(state=tkinter.DISABLED)
-    if WindowModel:
+    if DoModel:
         TextW.grab_set()
     TextT.pack(side=tkinter.LEFT, fill=tkinter.Y)
     TextScr.pack(side=tkinter.RIGHT, fill=tkinter.Y)
@@ -328,7 +338,8 @@ def GenerateSystemInfo():
     info += "Memory:\t%.3fMB\n" % (psutil.virtual_memory().total / 1048576)
     info += "PyTorch version:\t%s\n" % torch.__version__
     info += "NumPy version:\t%s\n" % RWCore.np.__version__
-    info += "pySoundFile version:\t%s\n" % soundfile.__version__
+    info += "SoundFile version:\t%s\n" % soundfile.__version__
+    info += "libsndfile version:\t%s\n" % soundfile.__libsndfile_version__
     info += "CUDA available:\t%s\n" % torch.cuda.is_available()
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
