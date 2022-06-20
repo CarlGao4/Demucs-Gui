@@ -27,6 +27,53 @@ import _thread
 import subprocess
 from DemucsCallCore import *
 
+# These are file types defined in libsndfile 1.1.0
+FileTypes = {
+    "AIFF (Apple/SGI)": "aiff",
+    "AU (Sun/NeXT)": "au",
+    "AVR (Audio Visual Research)": "avr",
+    "CAF (Apple Core Audio File)": "caf",
+    "FLAC (Free Lossless Audio Codec)": "flac",
+    "HTK (HMM Tool Kit)": "htk",
+    "IFF (Amiga IFF/SVX8/SV16)": "iff",
+    "MAT4 (GNU Octave 2.0 / Matlab 4.2)": "mat",
+    "MAT5 (GNU Octave 2.1 / Matlab 5.0)": "mat",
+    "MPC (Akai MPC 2k)": "mpc",
+    "MPEG-1/2 Audio": "m1a",
+    "OGG (OGG Container format)": "oga",
+    "PAF (Ensoniq PARIS)": "paf",
+    "PVF (Portable Voice Format)": "pvf",
+    "RAW (header-less)": "raw",
+    "RF64 (RIFF 64)": "rf64",
+    "SD2 (Sound Designer II)": "sd2",
+    "SDS (Midi Sample Dump Standard)": "sds",
+    "SF (Berkeley/IRCAM/CARL)": "sf",
+    "VOC (Creative Labs)": "voc",
+    "W64 (SoundFoundry WAVE 64)": "w64",
+    "WAV (Microsoft)": "wav",
+    "WAV (NIST Sphere)": "wav",
+    "WAVEX (Microsoft)": "wav",
+    "WVE (Psion Series 3)": "wve",
+    "XI (FastTracker 2)": "xi",
+    "VOX ADPCM": "vox",
+    "MPEG Layer I": "mp1",
+    "MPEG Layer II": "mp2",
+    "MPEG Layer III": "mp3",
+}
+
+types = []
+for i in soundfile.available_formats().values():
+    try:
+        types.append((i, "*." + FileTypes[i]))
+    except:
+        pass
+for i in soundfile.available_subtypes().values():
+    try:
+        types.append((i, "*." + FileTypes[i]))
+    except:
+        pass
+types = [("All available formats", ' '.join(i[1] for i in types))] + types
+
 
 def convert_audio(wav, from_samplerate, to_samplerate, channels):
     """Convert audio from a given samplerate to a target one and target number of channels."""
