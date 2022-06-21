@@ -182,10 +182,10 @@ def Start():
 
     # Add newer file formats that soundfile 0.10.3 doesn't define
     if soundfile.__libsndfile_version__ >= "1.0.29":
-        soundfile._formats["OPUS"] = 0x0064
-        soundfile._formats["NMS_ADPCM_16"] = 0x0022
-        soundfile._formats["NMS_ADPCM_24"] = 0x0023
-        soundfile._formats["NMS_ADPCM_32"] = 0x0024
+        soundfile._subtypes["OPUS"] = 0x0064
+        soundfile._subtypes["NMS_ADPCM_16"] = 0x0022
+        soundfile._subtypes["NMS_ADPCM_24"] = 0x0023
+        soundfile._subtypes["NMS_ADPCM_32"] = 0x0024
     if soundfile.__libsndfile_version__ >= "1.1.0":
         soundfile._formats["MPEG"] = 0x230000
         soundfile._subtypes["MPEG_LAYER_I"] = 0x0080
