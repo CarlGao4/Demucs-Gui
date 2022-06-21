@@ -14,7 +14,7 @@ For Linux: We currently have no intention to pack binaries for linux.
 #### Hardware
 Memory: At least 6GB memory, but 8GB swap may be required. The longer the track you want to separate, the more memory will be required. 
 
-GPU: Only NVIDIA GPUs are available. At least 3GB of **private memory** (not shared memory) is required. 
+GPU: Only NVIDIA GPUs are supported. At least 3GB of **private memory** (not shared memory) is required. 
 
 ### Running the codes yourself
 At least Python 3.9 is required. Other requirements please refer to [Installing binaries](#installing-binaries). 
