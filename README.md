@@ -7,7 +7,7 @@ The project aims to let users without any coding experience separate tracks with
 #### System version
 For Windows: At least Windows 8
 
-For Mac: At least macOS 10.13
+For Mac: At least macOS 10.15
 
 For Linux: We currently have no intention to pack binaries for linux. 
 
