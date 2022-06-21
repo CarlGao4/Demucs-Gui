@@ -1,4 +1,4 @@
-## Demucs GUI
+## ![Icon](./icon/icon_32x32.png) Demucs GUI
 This is a GUI for python project `demucs` with optimized memory usage in CUDA. 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/facebookresearch/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases. 
 
