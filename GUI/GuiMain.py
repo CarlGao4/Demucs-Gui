@@ -358,17 +358,18 @@ def do_nothing(*_, **__):
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     w = tkinter.Tk()
     LoadingImgTk = PIL.ImageTk.PhotoImage(LoadingImg)
     w.title("Demucs GUI")
     w.resizable(0, 0)
+
+    w.withdraw()
+
     if sys.platform == "darwin":
         w.iconbitmap("icon/icon.icns")
     else:
         w.iconbitmap("icon/icon.ico")
-
-    w.withdraw()
-
     LoadingW = tkinter.Toplevel(w)
     if sys.platform != "darwin":
         LoadingW.overrideredirect(True)
