@@ -295,12 +295,15 @@ def Separate(File: pathlib.Path):
             LastDevice.lower(),
             SetStatusText,
         )
-    except:
+    except RuntimeError:
         tkinter.messagebox.showerror(
             "Failed to separate",
             'If error is out of memory, please use smaller "split", or close programs require a lot of memory (like browser, games, photo&video editor), or use CPU instead\n\n'
             + traceback.format_exc(),
         )
+        logging.error(traceback.format_exc())
+    except:
+        tkinter.messagebox.showerror("Failed to separate", traceback.format_exc())
         logging.error(traceback.format_exc())
     model.to("cpu")
     for _ in range(10):
@@ -359,6 +362,10 @@ if __name__ == "__main__":
     LoadingImgTk = PIL.ImageTk.PhotoImage(LoadingImg)
     w.title("Demucs GUI")
     w.resizable(0, 0)
+    if sys.platform == "darwin":
+        w.iconbitmap("icon/icon.icns")
+    else:
+        w.iconbitmap("icon/icon.ico")
 
     w.withdraw()
 
