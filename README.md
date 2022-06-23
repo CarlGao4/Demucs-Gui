@@ -22,7 +22,7 @@ GPU: Only NVIDIA GPUs are supported. At least 3GB of **private memory** (not sha
 At least Python 3.9 is required. Other requirements please refer to [Installing binaries](#installing-binaries). 
 
 ## Downloads
-Binariea for download are available [here](https://github.com/CarlGao4/Demucs-Gui/releases). 
+Binaries for download are available [here](https://github.com/CarlGao4/Demucs-Gui/releases). 
 
 ## Update History
 (For more please see [history.md](history.md))
