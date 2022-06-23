@@ -152,7 +152,7 @@ def Start():
     logging.info("System memory: %d (%s)" % (psutil.virtual_memory().total, HSize(psutil.virtual_memory().total)))
     logging.info("System free memory: %d (%s)" % (psutil.virtual_memory().free, HSize(psutil.virtual_memory().free)))
     logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, HSize(psutil.swap_memory().total)))
-    if psutil.virtual_memory().total < 6000000000:
+    if psutil.virtual_memory().total < 6000000000 and sys.platform != "darwin":
         LoadingW.attributes("-topmost", False)
         tkinter.messagebox.showwarning(
             "Failed to initialize",
