@@ -75,14 +75,6 @@ def LoadModel():
     MB.config(state=tkinter.DISABLED)
     MP.config(state=tkinter.DISABLED)
     SetStatusText("Loading model...")
-    # if MPV.get() != "":
-    #     if not os.path.exists(pathlib.Path(MPV.get()) / (MV.get() + ".yaml")):
-    #         tkinter.messagebox.showerror("Model load failed", "No such model")
-    #         ME.config(state=tkinter.NORMAL)
-    #         MB.config(state=tkinter.NORMAL)
-    #         MP.config(state=tkinter.NORMAL)
-    #         SetStatusText("Failed to load model")
-    #         return
     try:
         logging.info("Load model (%s) from (%s)" % (MV.get(), MPV.get()))
         model = RWCore.GetModel(
