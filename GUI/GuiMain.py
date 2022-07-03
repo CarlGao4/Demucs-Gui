@@ -68,23 +68,6 @@ def HSize(size):
     return str(round(s, 3)) + u[t]
 
 
-def GetDefaultSplitForCUDA():
-    if isinstance(model, RWCore.BagOfModels):
-        DefaultSplit = min(
-            list(i.segment for i in model.models)
-            + [(torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128]
-        )
-        return 6 if DefaultSplit < 6 else DefaultSplit
-    else:
-        DefaultSplit = min(
-            [
-                model.segment,
-                (torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128,
-            ]
-        )
-        return 6 if DefaultSplit < 6 else DefaultSplit
-
-
 def LoadModel():
     global model
     st = time.time()
@@ -120,13 +103,6 @@ def LoadModel():
         return
     logging.info("Model loaded")
     SetStatusText("Loading used %.3fs" % (time.time() - st))
-    if isinstance(model, RWCore.BagOfModels):
-        submodel = model.models[0]
-        logging.info(
-            "Model info: sr=%d, channels=%s, segment=%d" % (submodel.samplerate, submodel.channels, submodel.segment)
-        )
-    else:
-        logging.info("Model info: sr=%d, channels=%s, segment=%d" % (model.samplerate, model.channels, model.segment))
     POE.set(0.25)
     PHE.set(0)
     DLF.grid(column=0, row=1, padx=(20, 0), pady=(10, 0))
@@ -134,12 +110,9 @@ def LoadModel():
     FLF.grid(column=1, row=1, padx=(10, 20), pady=(10, 20))
     MH.config(state=tkinter.DISABLED)
     if LastDevice.startswith("CUDA"):
-        PPE.set(GetDefaultSplitForCUDA())
+        PPE.set(RWCore.GetDefaultSplitForCUDA(model, LastCudaID))
     else:
-        if isinstance(model, RWCore.BagOfModels):
-            PPE.set(min(i.segment for i in model.models))
-        else:
-            PPE.set(model.segment)
+        PPE.set(RWCore.GetData(model)["segment"])
 
 
 def Start():
@@ -290,7 +263,7 @@ def Separate(File: pathlib.Path):
             File.parent / (File.name + "_separated"),
             int(PPE.get()),
             float(POE.get()),
-            model.samplerate,
+            RWCore.GetData(model)["samplerate"],
             int(PHE.get()),
             LastDevice.lower(),
             SetStatusText,
@@ -490,16 +463,13 @@ if __name__ == "__main__":
                 LastCudaID = int(LastDevice[5:])
                 UseCPU = False
                 try:
-                    PPE.set(GetDefaultSplitForCUDA())
+                    PPE.set(RWCore.GetDefaultSplitForCUDA(model, LastCudaID))
                 except:
                     pass
             else:
                 UseCPU = True
                 try:
-                    if isinstance(model, RWCore.BagOfModels):
-                        PPE.set(min(i.segment for i in model.models))
-                    else:
-                        PPE.set(model.segment)
+                    PPE.set(RWCore.GetData(model)["segment"])
                 except:
                     pass
         if LastCudaID != cudaID:
@@ -652,15 +622,12 @@ if __name__ == "__main__":
         except:
             if not UseCPU:
                 try:
-                    PPE.set(GetDefaultSplitForCUDA())
+                    PPE.set(RWCore.GetDefaultSplitForCUDA(model, LastCudaID))
                 except:
                     pass
             else:
                 try:
-                    if isinstance(model, RWCore.BagOfModels):
-                        PPE.set(min(i.segment for i in model.models))
-                    else:
-                        PPE.set(model.segment)
+                    PPE.set(RWCore.GetData(model)["segment"])
                 except:
                     pass
         if int(orin) < 6:

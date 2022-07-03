@@ -20,6 +20,7 @@ from demucs.hdemucs import HDemucs
 from demucs.apply import BagOfModels, apply_model
 import pathlib
 import torch
+import logging
 from typing import Literal
 
 
@@ -31,7 +32,34 @@ def GetModel(
     model = _gm(name=name, repo=repo)
     model.to(device)
     model.eval()
+    if isinstance(model, BagOfModels):
+        submodel = model.models[0]
+        logging.info(
+            "Bag Of Models info: submodels=%d, sr=%d, channels=%s, segment=%d"
+            % (len(model.models), submodel.samplerate, submodel.audio_channels, submodel.segment)
+        )
+    else:
+        logging.info(
+            "Model info: sr=%d, channels=%s, segment=%d" % (model.samplerate, model.audio_channels, model.segment)
+        )
     return model
+
+
+def GetDefaultSplitForCUDA(model, LastCudaID):
+    if isinstance(model, BagOfModels):
+        DefaultSplit = min(
+            list(i.segment for i in model.models)
+            + [(torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128]
+        )
+        return 6 if DefaultSplit < 6 else DefaultSplit
+    else:
+        DefaultSplit = min(
+            [
+                model.segment,
+                (torch.cuda.get_device_properties(LastCudaID).total_memory // 1048576 - 1700) // 128,
+            ]
+        )
+        return 6 if DefaultSplit < 6 else DefaultSplit
 
 
 def GetData(model: HDemucs):
@@ -47,6 +75,8 @@ def GetData(model: HDemucs):
         res["models"] = 1
     # list of final output tracks
     res["sources"] = model.sources
+    # default split length
+    res["segment"] = model.segment if res["model"] == 1 else model.models[0].segment
     return res
 
 

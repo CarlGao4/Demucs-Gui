@@ -72,7 +72,7 @@ for i in soundfile.available_subtypes().values():
         types.append((i, "*." + FileTypes[i]))
     except:
         pass
-types = [("All available formats", ' '.join(i[1] for i in types))] + types
+types = [("All available formats", " ".join(i[1] for i in types))] + types
 
 
 def convert_audio(wav, from_samplerate, to_samplerate, channels):
@@ -196,7 +196,7 @@ def process(
         call("Separation %d/%d" % (i + 1, n))
         l = i * (split - overlap)
         r = l + split
-        result = Apply(model, torch.from_numpy(audio[:, l:r]).to(device))
+        result = Apply(model, torch.from_numpy(audio[:, l:r]).to(device), shifts=0)
         for (j, stem) in enumerate(stems):
             new_audio[j, :, l:r] += result[stem].cpu().numpy()
         total[l:r] += 1
