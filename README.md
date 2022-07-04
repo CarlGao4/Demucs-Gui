@@ -4,6 +4,26 @@
 This is a GUI for python project `demucs` with optimized memory usage in CUDA. 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/facebookresearch/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases. 
 
+<details id="CannotOpen">
+  <summary>Note for macOS users</summary>
+
+> Because of the limitation of Apple, Demucs-GUI need some extra configuration to work properly. 
+> 
+> First, we should allow running apps from all of sources. Execute following command in your Terminal (if you do not know where your Terminal.app is, please search your dashboard): 
+> 
+> ```bash
+> sudo spctl --master-disable
+> ```
+> You may need to input your password. 
+> 
+> Then, we need to bypass the notarization (replace the path below to where your Demucs-GUI.app is if you did not install to the default location): 
+> 
+> ```bash
+> sudo xattr -rd com.apple.quarantine /Applications/Demucs-GUI.app
+> ```
+
+</details>
+
 ## System requirements
 ### Installing binaries
 #### System version
