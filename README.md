@@ -72,9 +72,9 @@ conda install --yes --file requirements.txt
 2. Run `pip`, `conda` or other package managers to install all packages in [requirements_cuda.txt](requirements_cuda.txt). If you are using 0.1a1, please manually add `psutil>=5.7.0` into `requirements_cuda.txt`, please add it manually before installing dependencies, because I forgot to add it. 
 ```bash
 # For pip
-pip install -r requirements.txt
+pip install -r requirements_cuda.txt
 # For conda
-conda install --yes --file requirements.txt
+conda install --yes --file requirements_cuda.txt
 ```
 3. Download [pretrained](https://app.box.com/s/rd6h9dilocrrfbsh8u4izgbpnq4w9dnj) models and extract it to `pretrained` folder under `GUI` folder.  
 4. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem. 
