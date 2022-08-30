@@ -145,19 +145,6 @@ def Start():
     logging.info("NumPy version: %s" % RWCore.np.__version__)
     logging.info("Demucs version: %s" % RWCore.demucs.__version__)
 
-    # Add newer file formats that soundfile 0.10.3 doesn't define
-    if soundfile.__libsndfile_version__ >= "1.0.29":
-        soundfile._subtypes["OPUS"] = 0x0064
-        soundfile._subtypes["NMS_ADPCM_16"] = 0x0022
-        soundfile._subtypes["NMS_ADPCM_24"] = 0x0023
-        soundfile._subtypes["NMS_ADPCM_32"] = 0x0024
-    if soundfile.__libsndfile_version__ >= "1.1.0":
-        soundfile._formats["MPEG"] = 0x230000
-        soundfile._subtypes["MPEG_LAYER_I"] = 0x0080
-        soundfile._subtypes["MPEG_LAYER_II"] = 0x0081
-        soundfile._subtypes["MPEG_LAYER_III"] = 0x0082
-        soundfile._default_subtypes["MPEG"] = "MPEG_LAYER_III"
-
     global devices, cudaID, UseCPU
     devices = ["CPU - %s (%d MiB)" % (platform.processor(), psutil.virtual_memory().total // 1048576)]
     DV.set(devices[0])
