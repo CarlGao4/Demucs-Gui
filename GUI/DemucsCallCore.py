@@ -22,6 +22,20 @@ import pathlib
 import torch
 import logging
 from typing import Literal
+import os
+import re
+
+
+def GetModelList(*dirs):
+    model_bag = []
+    model_single = []
+    for dir in dirs:
+        for file in os.listdir(dir):
+            if file.endswith(".yaml"):
+                model_bag.append(file[:-5])
+            elif re.match("[0-9a-fA-F]{8}-[0-9a-fA-F]{8}\\.th"):
+                model_single.append(file[:8])
+    return model_bag + model_single
 
 
 def GetModel(
