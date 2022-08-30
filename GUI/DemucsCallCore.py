@@ -76,7 +76,7 @@ def GetData(model: HDemucs):
     # list of final output tracks
     res["sources"] = model.sources
     # default split length
-    res["segment"] = model.segment if res["model"] == 1 else model.models[0].segment
+    res["segment"] = model.segment if res["models"] == 1 else model.models[0].segment
     return res
 
 

@@ -207,11 +207,13 @@ def process(
             stem = (new_audio[i] / total)[:, :orig_len]
             # torchaudio.save(f"{stems[i]}.wav", i16_pcm(torch.from_numpy(stem)), sample_rate)
             try:
-                soundfile.write(str(outpath / f"{stems[i]}.wav"), stem, sample_rate, format="WAV", subtype="PCM_16")
+                soundfile.write(
+                    str(outpath / f"{stems[i]}.wav"), stem.transpose(), sample_rate, format="WAV", subtype="PCM_16"
+                )
             except:
                 call("Failed to write with soundfile, using wave instead")
                 logging.error(traceback.format_exc())
                 write_wav(torch.from_numpy(stem.transpose()), str(outpath / f"{stems[i]}.wav"), sample_rate)
-
     else:
         pass
+    call("Seperated successfully")
