@@ -184,7 +184,7 @@ def process(
     audio = load_audio(str(infile), sample_rate)
     logging.debug(f"Loaded audio of shape {audio.shape}")
     orig_len = audio.shape[1]
-    n = int(np.ceil((orig_len - overlap) / (split - overlap)))
+    n = max(int(np.ceil((orig_len - overlap) / (split - overlap))), 1)
     audio = np.pad(audio, [(0, 0), (0, n * (split - overlap) + overlap - orig_len)])
     call("Loading model to device %s" % device)
     model.to(device)
