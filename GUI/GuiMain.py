@@ -369,7 +369,9 @@ if __name__ == "__main__":
     if sys.platform == "darwin":
         w.iconbitmap("icon/icon.icns")
     else:
-        w.iconbitmap("icon/icon.ico")
+        img = PIL.ImageTk.PhotoImage(PIL.Image.open("../icon/icon.png"))
+        w.tk.call('wm', 'iconphoto', w._w, img)
+
     LoadingW = tkinter.Toplevel(w)
     if sys.platform != "darwin":
         LoadingW.overrideredirect(True)
