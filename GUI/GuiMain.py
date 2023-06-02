@@ -368,6 +368,8 @@ if __name__ == "__main__":
 
     if sys.platform == "darwin":
         w.iconbitmap("icon/icon.icns")
+    elif sys.platform == "win32":
+        w.iconbitmap("icon/icon.ico")
     else:
         img = PIL.ImageTk.PhotoImage(PIL.Image.open("../icon/icon.png"))
         w.tk.call('wm', 'iconphoto', w._w, img)
