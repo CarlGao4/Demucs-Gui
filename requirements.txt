@@ -1,12 +1,5 @@
-dora-search
-diffq>=0.2.1
-julius>=0.2.3
-lameenc>=1.2
-openunmix
-pyyaml
-torch>=1.8.1
-demucs>=3.0.1
-Pillow>=8.0.0
+demucs>=4.0.1
 psutil>=5.7.0
 Soundfile>=0.9.0
 pyperclip
+PySide6
