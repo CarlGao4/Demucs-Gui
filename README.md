@@ -1,7 +1,7 @@
 ## [![Icon](./icon/icon_32x32.png)](.) Demucs GUI
 [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/CarlGao4/Demucs-GUI?include_prereleases&style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases) [![GitHub all releases](https://img.shields.io/github/downloads/CarlGao4/Demucs-GUI/total?style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases) [![GitHub](https://img.shields.io/github/license/carlgao4/demucs-gui?style=plastic)](LICENSE) [![platform](https://img.shields.io/badge/platform-win--64%20%7C%20osx--64-green?style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases)
 
-**This project is temporarily suspended, development will be resumed when the developers are available**
+**Version 1.0 is still under development, with batch processing, model listing and drag & drop supported, whose GUI has been rewritten with PySide6 (Qt). I will also pack binaries for Apple Silicon. Thanks for your patience.**
 
 This is a GUI for python project `demucs` with optimized memory usage in CUDA. 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/facebookresearch/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases. 
