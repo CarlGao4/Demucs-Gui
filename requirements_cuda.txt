@@ -1,7 +1,10 @@
 # Please install torch with cuda manually before installing this! 
 
-demucs>=4.0.1
+demucs>=4.1.0
+diffq
+numpy
 psutil>=5.7.0
-Soundfile>=0.9.0
 pyperclip
 PySide6
+Soundfile>=0.9.0
+soxr>=0.3.6
