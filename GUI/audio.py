@@ -64,3 +64,14 @@ def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = l
             update_status("Resampling audio")
         audio = soxr.resample(audio, sr, target_sr, "VHQ")
     return audio
+
+
+def save_audio(file, audio, format, sr, update_status: tp.Callable[[str], None] = lambda _: None):
+    if callable(update_status):
+        update_status(f"Saving audio: {file.name}")
+    try:
+        soundfile.write(file, audio.transpose(0, 1).numpy(), sr, format)
+    except soundfile.LibsndfileError:
+        logging.error(f"Failed to write file {file}:\n" + traceback.format_exc())
+        return
+    logging.info(f"Saved audio {file}: shape={audio.shape}")

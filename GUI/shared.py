@@ -30,15 +30,15 @@ if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)
 
 save_loc_syntax = """You can use variables to rename your output file.
-Variables "{track}", "{trackext}", "{stem}", "{ext}" will be replaced with track name \
-without extension, track extension, stem name and default output file extension.
+Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
+track extension, stem name, default output file extension and model name.
 
-For example, when saving stem "vocals" of "audio.mp3", with output format flac, the \
-default location "separated/{track}/{stem}.{ext}" would be "separated/audio/vocals.flac", \
-with the folder "separated" created under the same folder of the original audio file.
+For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default \
+location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/audio/vocals.flac", with the folder \
+"separated" created under the same folder of the original audio file.
 
-Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows \
-or "/xxx" on macOS and Linux) in case something unexpected would happen."""
+Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows or "/xxx" on macOS and \
+Linux) in case something unexpected would happen."""
 
 
 def HSize(size):

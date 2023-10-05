@@ -138,6 +138,7 @@ class StartingWindow(QMainWindow):
 class MainWindow(QMainWindow):
     showError = Signal(str, str)
     showInfo = Signal(str, str)
+    showWarning = Signal(str, str)
     showParamSettings = Signal()
 
     def __init__(self):
@@ -155,6 +156,7 @@ class MainWindow(QMainWindow):
         self.m = QMessageBox()
         self.showError.connect(self.showErrorFunc)
         self.showInfo.connect(self.showInfoFunc)
+        self.showWarning.connect(self.showWarningFunc)
         self.showParamSettings.connect(self.showParamSettingsFunc)
         self.timer.singleShot(50, self.showModelSelector)
 
@@ -190,6 +192,9 @@ class MainWindow(QMainWindow):
 
     def showInfoFunc(self, title, text):
         self.m.information(self, title, text)
+
+    def showWarningFunc(self, title, text):
+        self.m.warning(self, title, text)
 
 
 class ModelSelector(QGroupBox):
@@ -490,7 +495,7 @@ class SaveOptions(QGroupBox):
         self.location_group.addButton(self.loc_absolute_path_button, 1)
         self.loc_relative_path_button.setChecked(True)
         self.loc_input = QLineEdit()
-        self.loc_input.setText("separated/{track}/{stem}.{ext}")
+        self.loc_input.setText("separated/{model}/{track}/{stem}.{ext}")
         self.browse_button = QPushButton()
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.browseLocation)
@@ -515,9 +520,9 @@ class SaveOptions(QGroupBox):
         self.sample_fmt_label.setText("Sample format:")
 
         self.sample_fmt = QComboBox()
-        self.sample_fmt.addItem("int16", 16)
-        self.sample_fmt.addItem("int24", 24)
-        self.sample_fmt.addItem("float32", 32)
+        self.sample_fmt.addItem("int16", "PCM_16")
+        self.sample_fmt.addItem("int24", "PCM_24")
+        self.sample_fmt.addItem("float32", "FLOAT")
         self.sample_fmt.setCurrentIndex(0)
 
         self.widget_layout = QGridLayout()
@@ -540,6 +545,28 @@ class SaveOptions(QGroupBox):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
             self.loc_input.setText(p)
+
+    def save(self, file, tensor, save_func):
+        for stem, stem_data in tensor.items():
+            file_path_str = self.loc_input.text().format(
+                track=file.stem,
+                trackext=file.name,
+                stem=stem,
+                ext=self.file_format.currentText(),
+                model=main_window.model_selector.select_combobox.currentText(),
+            )
+            if self.location_group.checkedId() == 0:
+                file_path = file.parent / file_path_str
+            else:
+                file_path = pathlib.Path(file_path_str)
+            if self.clip_mode.currentText() == "rescale":
+                data = stem_data / stem_data.abs().max() * 0.999
+            elif self.clip_mode.currentText() == "clamp":
+                data = stem_data.clamp(-0.999, 0.999)
+            else:
+                data = stem_data
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            save_func(file_path, data, self.sample_fmt.currentData())
 
 
 class FileQueue(QGroupBox):
@@ -854,6 +881,9 @@ class SeparationControl(QGroupBox):
         self.startSeparateSignal.emit()
 
     def startSeparation(self):
+        global main_window
+        if "{stem}" not in main_window.save_options.loc_input.text():
+            main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         self.start_button.setEnabled(False)
         index = main_window.file_queue.getFirstQueued()
         if (index := main_window.file_queue.getFirstQueued()) is None:
@@ -871,6 +901,7 @@ class SeparationControl(QGroupBox):
             main_window.param_settings.overlap_spinbox.value(),
             main_window.param_settings.shifts_spinbox.value(),
             main_window.param_settings.device_selector.currentData(),
+            main_window.save_options.save,
             self.setModelProgress,
             self.setAudioProgress,
             self.setStatusSignal.emit,
@@ -886,11 +917,11 @@ class SeparationControl(QGroupBox):
 if __name__ == "__main__":
     try:
         shared.InitializeFolder()
-        filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_demucs_gui_log.log")
+        log_filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_demucs_gui_log.log")
         if shared.debug:
             log = sys.stderr
         else:
-            log = open(str(shared.logfile / filename), mode="at")
+            log = open(str(shared.logfile / log_filename), mode="at")
             sys.stderr = log
         handler = logging.StreamHandler(log)
         try:

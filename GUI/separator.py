@@ -216,6 +216,9 @@ class Separator:
         self.setModelProgress(min(1.0, float(progress_shift)))
         self.setAudioProgress(min(1.0, float(progress)), self.item)
 
+    def save_callback(self, *args):
+        audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
+
     def separate(
         self,
         file,
@@ -224,6 +227,7 @@ class Separator:
         overlap,
         shifts,
         device,
+        save_callback,
         setModelProgress: tp.Callable[[float], None],
         setAudioProgress: tp.Callable[[float, tp.Any], None],
         setStatus: tp.Callable[[tp.Any, int], None],
@@ -245,6 +249,7 @@ class Separator:
         self.setModelProgress = setModelProgress
 
         try:
+            self.updateStatus("Separating audio: %s" % file.name)
             self.separator.update_parameter(
                 device=device, segment=segment, shifts=shifts, overlap=overlap, callback=self.updateProgress
             )
@@ -253,9 +258,7 @@ class Separator:
             if src_channels != self.separator.model.audio_channels:
                 out = {}
                 for stem in self.separator.model.sources:
-                    out[stem] = torch.zeros(
-                        src_channels, wav_torch.shape[1], dtype=torch.float32
-                    )
+                    out[stem] = torch.zeros(src_channels, wav_torch.shape[1], dtype=torch.float32)
                 self.in_length = src_channels
                 self.out_length = 0
                 for i in range(src_channels):
@@ -277,6 +280,8 @@ class Separator:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
             return
+        save_callback(file, out, self.save_callback)
+        self.updateStatus(f"Successfully separated audio {file.name}")
         finishCallback(shared.FileStatus.Finished, item)
         self.separating = False
         return
