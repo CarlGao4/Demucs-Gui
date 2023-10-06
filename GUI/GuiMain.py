@@ -94,7 +94,8 @@ class StartingWindow(QMainWindow):
         self.setWindowIcon(QtGui.QIcon("./icon/icon.ico"))
         self.label.setPixmap(self.pic)
 
-        self.status_font_id = QtGui.QFontDatabase.addApplicationFont("./fonts/Montserrat-Bold.ttf")
+        fontpath = pathlib.Path("./fonts/Montserrat-Bold.ttf").resolve()
+        self.status_font_id = QtGui.QFontDatabase.addApplicationFont(str(fontpath))
         families = QtGui.QFontDatabase.applicationFontFamilies(self.status_font_id)
 
         self.status = QLabel(self)
