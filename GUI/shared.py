@@ -24,7 +24,7 @@ import traceback
 
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
-debug = True
+debug = False
 
 if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)
