@@ -29,6 +29,10 @@ debug = False
 if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)
 
+if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
+    import ctypes
+    ctypes.windll.kernel32.FreeConsole()
+
 save_loc_syntax = """You can use variables to rename your output file.
 Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
 track extension, stem name, default output file extension and model name.
