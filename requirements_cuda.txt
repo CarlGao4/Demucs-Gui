@@ -1,7 +1,6 @@
 # Please install torch with cuda manually before installing this! 
 
-demucs>=4.1.0
-diffq
+demucs>=4.1.0a2
 numpy
 psutil>=5.7.0
 pyperclip
