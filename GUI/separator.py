@@ -72,7 +72,7 @@ def getAvailableDevices():
     devices.append(("CPU - %s (%d MiB)" % (platform.processor(), psutil.virtual_memory().total / 1048576), "cpu"))
     if sys.platform == "darwin":
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():
-            devices.append(("MPS (%d MiB)" % psutil.virtual_memory().total / 1048576, "mps"))
+            devices.append(("MPS (%d MiB)" % (psutil.virtual_memory().total / 1048576), "mps"))
             default_device = 1
     else:
         if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
