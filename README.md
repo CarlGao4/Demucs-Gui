@@ -77,8 +77,7 @@ conda install --yes --file requirements.txt
 ```bash
 # For pip
 pip install -r requirements_cuda.txt
-# For conda
-conda install --yes --file requirements_cuda.txt
+# Conda is not available as this project has dependencies only on PyPI
 ```
 1. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem.
 
