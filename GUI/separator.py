@@ -209,6 +209,7 @@ class Separator:
             progress_shift += Fraction(
                 int(self.segment * (1 - self.overlap) * self.separator.samplerate), progress_dict["audio_length"]
             )
+        progress_shift = min(Fraction(1, 1), progress_shift)
         progress_model += progress_per_shift * progress_shift
         progress += progress_model * progress_per_model
         progress *= Fraction(1, self.in_length)
