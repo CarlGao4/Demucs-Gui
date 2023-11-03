@@ -133,7 +133,7 @@ class StartingWindow(QMainWindow):
         main_window = MainWindow()
         main_window.show()
         self.hide()
-        main_window.statusBar().showMessage("Startup took %.3fs" % (self.end_time - self.start_time - paused_time))
+        main_window.setStatusText.emit("Startup took %.3fs" % (self.end_time - self.start_time - paused_time))
 
 
 class MainWindow(QMainWindow):
@@ -141,6 +141,7 @@ class MainWindow(QMainWindow):
     showInfo = Signal(str, str)
     showWarning = Signal(str, str)
     showParamSettings = Signal()
+    setStatusText = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -159,6 +160,7 @@ class MainWindow(QMainWindow):
         self.showInfo.connect(self.showInfoFunc)
         self.showWarning.connect(self.showWarningFunc)
         self.showParamSettings.connect(self.showParamSettingsFunc)
+        self.setStatusText.connect(self.setStatusTextFunc)
         self.timer.singleShot(50, self.showModelSelector)
 
     def showModelSelector(self):
@@ -179,7 +181,7 @@ class MainWindow(QMainWindow):
 
     def loadModel(self, model, repo):
         try:
-            self.separator = separator.Separator(model, repo, self.statusBar().showMessage)
+            self.separator = separator.Separator(model, repo, self.setStatusText.emit)
         except:
             logging.error(
                 "Failed to load model %s from %s:\n%s"
@@ -196,6 +198,9 @@ class MainWindow(QMainWindow):
 
     def showWarningFunc(self, title, text):
         self.m.warning(self, title, text)
+
+    def setStatusTextFunc(self, text):
+        self.statusBar().showMessage(text)
 
 
 class ModelSelector(QGroupBox):
@@ -270,7 +275,7 @@ class ModelSelector(QGroupBox):
         logging.info(
             "Loading model %s from repo %s" % (model_name, model_repo if model_repo is not None else '"remote"')
         )
-        main_window.statusBar().showMessage("Loading model %s" % model_name)
+        main_window.setStatusText.emit("Loading model %s" % model_name)
 
         start_time = time.perf_counter()
         success = main_window.loadModel(model_name, model_repo)
@@ -287,7 +292,7 @@ class ModelSelector(QGroupBox):
         model_info = main_window.separator.modelInfo()
         main_window.model_selector.model_info.setText(model_info)
         self.model_info.setMinimumHeight(self.model_info.heightForWidth(400))
-        main_window.statusBar().showMessage("Model loaded within %.4fs" % (end_time - start_time))
+        main_window.setStatusText.emit("Model loaded within %.4fs" % (end_time - start_time))
         main_window.showParamSettings.emit()
         logging.info("Model loaded within %.4fs" % (end_time - start_time))
         logging.info(model_info)
@@ -865,7 +870,7 @@ class SeparationControl(QGroupBox):
         if status == shared.FileStatus.Finished:
             item.setData(ProgressDelegate.TextRole, "Finished")
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Finished])
-            main_window.statusBar().showMessage(
+            main_window.setStatusText.emit(
                 "Separation finished: %s" % main_window.file_queue.table.item(item.row(), 0).text()
             )
         elif status == shared.FileStatus.Failed:
