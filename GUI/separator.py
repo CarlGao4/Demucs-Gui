@@ -259,6 +259,7 @@ class Separator:
             )
             wav_torch = torch.from_numpy(wav).clone().transpose(0, 1)
             src_channels = wav_torch.shape[0]
+            logging.info("Running separation...")
             if src_channels != self.separator.model.audio_channels:
                 out = {}
                 for stem in self.separator.model.sources:
@@ -284,6 +285,7 @@ class Separator:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
             return
+        logging.info("Saving separated audio...")
         save_callback(file, out, self.save_callback)
         self.updateStatus(f"Successfully separated audio {file.name}")
         finishCallback(shared.FileStatus.Finished, item)
