@@ -25,6 +25,7 @@ import traceback
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
 debug = True
+use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
 if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)

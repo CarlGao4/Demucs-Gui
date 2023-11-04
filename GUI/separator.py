@@ -127,7 +127,7 @@ def autoListModels():
                 info += "\nRepo: " + str(repopath)
                 info += "\nFile: " + str(filepath)
             singles.append((sig, info, repopath))
-    models, infos, each_repos = tuple(zip(*(bags + singles)))
+    models, infos, each_repos = tuple(zip(*(bags + singles + [("demucs_unittest", "Unit test model", None)])))
     return models, infos, each_repos
 
 
@@ -234,6 +234,9 @@ class Separator:
         setStatus: tp.Callable[[tp.Any, int], None],
         finishCallback: tp.Callable[[int, tp.Any], None],
     ):
+        logging.info("Start separating audio: %s" % file.name)
+        logging.info("Parameters: segment=%.2f overlap=%.2f shifts=%d" % (segment, overlap, shifts))
+        logging.info("Device: %s" % device)
         try:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)

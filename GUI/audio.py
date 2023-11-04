@@ -56,7 +56,7 @@ def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = l
         audio, sr = soundfile.read(file, dtype="float32", always_2d=True)
     except soundfile.LibsndfileError:
         logging.error(f"Failed to read file {file}:\n" + traceback.format_exc())
-        return
+        raise
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
     if target_sr is not None and sr != target_sr:
         logging.info(f"Samplerate {sr} doesn't match target {target_sr}, resampling with SoXR")

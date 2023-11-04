@@ -14,38 +14,75 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
-__version__ = "1.0a1"
+__version__ = "1.0"
 
-from PySide6 import QtGui
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QApplication,
-    QButtonGroup,
-    QComboBox,
-    QDialog,
-    QDoubleSpinBox,
-    QFileDialog,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QMainWindow,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QSlider,
-    QSpinBox,
-    QStatusBar,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+import shared
+
+if not shared.use_PyQt6:
+    from PySide6 import QtGui
+    from PySide6.QtCore import Qt, QTimer, Signal
+    from PySide6.QtWidgets import (
+        QAbstractItemView,
+        QApplication,
+        QButtonGroup,
+        QComboBox,
+        QDialog,
+        QDoubleSpinBox,
+        QFileDialog,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QHeaderView,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMainWindow,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QRadioButton,
+        QSlider,
+        QSpinBox,
+        QStatusBar,
+        QStyleFactory,
+        QTableWidget,
+        QTableWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
+else:
+    from PyQt6 import QtGui  # type: ignore
+    from PyQt6.QtCore import Qt, QTimer  # type: ignore
+    from PyQt6.QtCore import pyqtSignal as Signal  # type: ignore
+    from PyQt6.QtWidgets import (  # type: ignore
+        QAbstractItemView,
+        QApplication,
+        QButtonGroup,
+        QComboBox,
+        QDialog,
+        QDoubleSpinBox,
+        QFileDialog,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QHeaderView,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMainWindow,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QRadioButton,
+        QSlider,
+        QSpinBox,
+        QStatusBar,
+        QStyleFactory,
+        QTableWidget,
+        QTableWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
 
 import datetime
 import logging
@@ -61,7 +98,6 @@ import time
 import traceback
 
 import separator
-import shared
 from PySide6_modified import ModifiedQLabel, ProgressDelegate
 
 
@@ -894,6 +930,7 @@ class SeparationControl(QGroupBox):
         index = main_window.file_queue.getFirstQueued()
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
+            main_window.setStatusText.emit("No more file to separate")
             return
         file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
         item = main_window.file_queue.table.item(index, 1)
@@ -971,5 +1008,10 @@ if __name__ == "__main__":
     app = QApplication([])
     starting_window = StartingWindow()
     starting_window.show()
+    logging.debug("Supported styles: %s" % ", ".join(QStyleFactory.keys()))
+    style_setting = shared.GetSetting("style", app.style().objectName())
+    if style_setting.lower() in [i.lower() for i in QStyleFactory.keys()]:
+        app.setStyle(QStyleFactory.create(style_setting))
+    logging.debug("Current style: %s" % app.style().objectName())
 
     app.exec()
