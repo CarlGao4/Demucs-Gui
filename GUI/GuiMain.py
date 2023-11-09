@@ -226,6 +226,25 @@ class MainWindow(QMainWindow):
             return False
         return True
 
+    def closeEvent(self, event):
+        if (
+            (not hasattr(self, "separator"))
+            or (not self.separator.separating)
+            or (
+                self.m.question(
+                    self,
+                    "Separation in progress",
+                    "Separation is not finished, quit anyway?",
+                    self.m.StandardButton.Yes,
+                    self.m.StandardButton.Cancel,
+                )
+                == self.m.StandardButton.Yes
+            )
+        ):
+            return super().closeEvent(event)
+        else:
+            event.ignore()
+
     def showErrorFunc(self, title, text):
         self.m.critical(self, title, text)
 
