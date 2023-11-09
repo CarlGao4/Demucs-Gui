@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import pathlib
+import subprocess
 import sys
 import traceback
 
@@ -32,6 +33,7 @@ if not (homeDir.parent / ".git").exists():
 
 if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
     import ctypes
+
     ctypes.windll.kernel32.FreeConsole()
 
 save_loc_syntax = """You can use variables to rename your output file.
@@ -112,3 +114,12 @@ class FileStatus:
     Finished = 5
     Failed = 6
     Cancelled = 7
+
+
+def Popen(*args, **kwargs):
+    """A wrapper of `subprocess.Popen` to hide console window on Windows and redirect stdout and stderr to PIPE"""
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    kwargs["stdout"] = subprocess.PIPE
+    kwargs["stderr"] = subprocess.PIPE
+    return subprocess.Popen(*args, **kwargs)

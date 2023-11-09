@@ -678,7 +678,9 @@ class FileQueue(QGroupBox):
         self.add_files_button = QPushButton()
         self.add_files_button.setText("Add files")
         self.add_files_button.clicked.connect(
-            lambda: self.addFiles(QFileDialog.getOpenFileNames(main_window, "Add files to queue")[0])
+            lambda: self.addFiles(
+                QFileDialog.getOpenFileNames(main_window, "Add files to queue", filter=separator.audio.format_filter)[0]
+            )
         )
 
         self.remove_files_button = QPushButton()

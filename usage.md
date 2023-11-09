@@ -2,16 +2,19 @@
 
 **Everybody is welcomed to contribute to this document! Please refer to [#23](https://github.com/CarlGao4/Demucs-Gui/discussions/23) for more information.**
 
+**This document is written for 1.0 or newer versions (including beta versions like 1.0a1).**
+
 ## Quick Start
 
 1. Download the latest version of Demucs GUI from [GitHub Releases](https://github.com/CarlGao4/Demucs-Gui/releases) or [FossHUB](https://www.fosshub.com/Demucs-GUI.html). There are different download types:
 - `CUDA Windows 64-bit`: For Windows users with NVIDIA GPU (whose compute capability is greater than 3.5).
 - `CPU Windows 64-bit`: For Windows users without NVIDIA GPU.
-- `ROCm Windows 64-bit`: For Windows users with AMD GPU.
+<!-- - `ROCm Windows 64-bit`: For Windows users with AMD GPU. -->
 - `CPU macOS 64-bit`: For macOS users with Intel CPU.
-- `MPS macOS ARM64`: For macOS users with Apple Silicon CPU.
+- `CPU macOS 64-bit; MPS macOS Rosetta 2`: For macOS users (Both Intel Mac and Apple Silicon Mac). You may need to install Rosetta 2 on Apple Silicon Mac. MPS acceleration is available on Apple Silicon Mac.
+<!-- - `MPS macOS ARM64`: For macOS users with Apple Silicon CPU. -->
 
-*\*Not all releases are ready for download*
+<!-- *\*Not all releases are ready for download* -->
 
 2. Extract the downloaded file
 - Windows: 7z format, can be extracted with [7-Zip](https://www.7-zip.org/). If you are using Windows 11 23H2, you can also directly extract the file with Windows Explorer.
@@ -74,6 +77,8 @@ Once you've loaded a model, you can't load another model or unload it. The only 
 
 3. On Windows, the progress bar should have animation. However, rendering a lot of progress bars at the same time (like the queue) will consume a lot of CPU resources. So, the animation is disabled in the queue (animation will still be rendered when the text like percentage changes). I don't like this, so I added this: If you click on the header `Status`, the animation will be enabled. Click again to disable it.
 
+4. The default style on macOS (`macOS`) can't render progress bars correctly inside a table, so the style of the queue is changed to `Fusion` on macOS and may looks different from the main window. *\*New in 1.0*
+
 ### Separation parameters
 
 #### Segment
@@ -105,6 +110,44 @@ For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with
 
 Demucs GUI will overwrite existing files without warning. Remember to include `{stem}` in your output file name.
 
+### Reading with FFMpeg
+
+Demucs GUI will use FFMpeg to read files if the default backend Soundfile (which uses libsndfile) fails, which enables separating a video (its audio stream, actually). When reading with FFMpeg, Demucs GUI will call `ffmpeg -v level+warning -i "{file}" -map a:0 -ar {samplerate} -c:a pcm_f32le -f wav -` and decode the stdout. So only the first stream of the file will be separated. If the file contains no audio stream, separation will fail. *\*New in 1.0*
+
+Demucs GUI will calls FFMpeg according to PATH environment variable. Before detecting FFMpeg, `./ffmpeg` will be added to PATH. You can control where to append it (before or after the original PATH) in the config file. *\*New in 1.0*
+
+## About the config file
+
+Demucs GUI will create a config file in the config folder of Demucs GUI. On Windows, it is `%APPDATA%\demucs-gui\settings.json`. On macOS and Linux, it is `~/.config/demucs-gui/settings.json`. You can edit it to change the default parameters of separation.
+
+Please remember that there is no validation of the config file. If you make a mistake, Demucs GUI may not work properly. If you want to reset the config file, just delete it.
+
+Here are some of keys and their meanings:
+
+### `style`
+
+type: `string`
+
+The style of the application. Available values can be found in log file. The default value is `windowsvista` on Windows and `macos` on macOS. The separation queue will always use `fusion` on macOS. The values are case insensitive. *\*New in 1.0*
+
+### `prepend_ffmpeg_path`
+
+type: `boolean`
+
+If true, `./ffmpeg` will be added to PATH before the original PATH. If false, `./ffmpeg` will be added to PATH after the original PATH. The default value is `false`. *\*New in 1.0*
+
+### `custom_repo`
+
+type: `array[string]`
+
+An array of custom repos. This can be set inside the application (click on `advanced` button). The default value is `[]`. The default repos (See [Load custom models](#Load-custom-models)) will be prepended to this array.
+
+### `file_list_animation`
+
+type: `boolean`
+
+See [Some "useless" functions of separation queue](#Some-"useless"-functions-of-separation-queue) 3rd point.
+
 ## Q&A
 
 ### Why is the model loading so slow?
@@ -116,6 +159,10 @@ If you have chosen a remote model and are using it for the first time, it will b
 Demucs GUI is packed with PyInstaller. All softwares packed with PyInstaller uses similar bootloader with different payloads. Once a new version of PyInstaller is released, countless developers will package their softwares with the latest version and distribute them. This may be seen as a virus as viruses can hide themselves in normal softwares, which contains different payloads but the same bootloader and spread all around the world.
 
 I promise that Demucs GUI is safe. You can check the source code and build it yourself. If you still don't trust me, you can use the source code to build your own version of Demucs GUI.
+
+### The progress bar is not moving
+
+The progress bar is discrete, not continuous. It will only update when a segment is separated. The approximate time is 1.5 times of the length of the audio file using CPU (i5 or i7, 8th to 11th gen). Using a GPU (CUDA) can speed up about 20 times. Using a GPU (MPS) can speed up about 5 times for HTDemucs models and ***slow down*** about 2 times for Demucs models.
 
 ### Failed to separate an audio
 

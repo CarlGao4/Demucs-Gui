@@ -240,6 +240,7 @@ class Separator:
         try:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
+            assert wav is not None
         except:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
