@@ -9,13 +9,13 @@ The project aims to let users without any coding experience separate tracks with
 
 <details id="CannotOpen">
   <summary>Note for macOS users</summary>
+
 If the application cannot be launched due to the Mac's security protection feature, try the following:
 
 1. Right-click on the Demucs-GUI app icon and select "Open".
 1. Click "Open" again in the window that appears as follows.
-<p align="center">
-  <img width=300 src="./mac_open_anyway.png"/>
-</p>
+![Open Anyway](./mac_open_anyway.png)
+
 </details>
 
 ## System requirements

@@ -23,13 +23,13 @@
 
 <details id="CannotOpen">
   <summary>macOS: I cannot run this program</summary>
+
 If the application cannot be launched due to the Mac's security protection feature, try the following:
 
 1. Right-click on the Demucs-GUI app icon and select "Open".
 1. Click "Open" again in the window that appears as follows.
-<p align="center">
-  <img width=300 src="./mac_open_anyway.png"/>
-</p>
+![Open Anyway](./mac_open_anyway.png)
+
 </details>
 
 4. Load a model. The default model packed with Demucs GUI is `htdemucs`. Click on `load` button to load. If you have chosen a remote model and are using it for the first time, it will be downloaded automatically. During this period of time, there will be no outputs and the whole window will be frozen. Please be patient.
