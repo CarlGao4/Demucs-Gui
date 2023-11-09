@@ -6,4 +6,4 @@ labels: enhancement
 
 ## New feature required
 
-Your requirement. 
+Your requirement. Please submit only one suggestion in each issue. Open more issues if you have more ideas, so I can track these more efficiently.

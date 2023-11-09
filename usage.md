@@ -27,25 +27,11 @@
 <details id="CannotOpen">
   <summary>macOS: I cannot run this program</summary>
 
-> Because of the limitation of Apple, Demucs-GUI need some extra configuration to work properly.
->
-> First, we should allow running apps from all of sources. Execute following command in your Terminal (if you do not know where your Terminal.app is, please search your dashboard):
->
-> ```bash
-> sudo spctl --master-disable
-> ```
-> You may need to input your password.
->
-> Then, we need to bypass the notarization (replace the path below to where your Demucs-GUI.app is if you did not install to the default location):
->
-> ```bash
-> sudo xattr -rd com.apple.quarantine /Applications/Demucs-GUI.app
-> ```
->
-> You can also disallow runing apps from all sources again to increase your security:
-> ```bash
-> sudo spctl --master-enable
-> ```
+If the application cannot be launched due to the Mac's security protection feature, try the following:
+
+1. Right-click on the Demucs-GUI app icon and select "Open".
+1. Click "Open" again in the window that appears as follows.
+![Open Anyway](./mac_open_anyway.png)
 
 </details>
 
