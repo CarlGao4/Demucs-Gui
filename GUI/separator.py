@@ -74,6 +74,9 @@ def getAvailableDevices():
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():
             devices.append(("MPS (%d MiB)" % (psutil.virtual_memory().total / 1048576), "mps"))
             default_device = 1
+            logging.info("MPS backend is available")
+        else:
+            logging.info("MPS backend is not available")
     else:
         if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0

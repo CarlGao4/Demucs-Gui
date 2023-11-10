@@ -78,6 +78,7 @@ def read_audio_soundfile(file, target_sr=None, update_status: tp.Callable[[str],
         update_status(f"Reading audio: {file.name if hasattr(file, 'name') else file}")
     audio, sr = soundfile.read(file, dtype="float32", always_2d=True)
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
+    assert audio.shape[0] > 0, "Audio is empty"
     if target_sr is not None and sr != target_sr:
         logging.info(f"Samplerate {sr} doesn't match target {target_sr}, resampling with SoXR")
         if callable(update_status):
@@ -110,6 +111,7 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
         logging.debug(p.stderr.read().decode())
     audio, sr = soundfile.read(wav_buffer, dtype="float32", always_2d=True)
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
+    assert audio.shape[0] > 0, "Audio is empty"
     return audio
 
 
