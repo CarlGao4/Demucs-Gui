@@ -226,6 +226,23 @@ class Separator:
         progress += Fraction(self.out_length, self.in_length)
         self.setModelProgress(min(1.0, float(progress_shift)))
         self.setAudioProgress(min(1.0, float(progress)), self.item)
+        current_time = time.time()
+        self.time_hists.append((current_time, progress))
+        if current_time - self.last_update_eta > 1:
+            self.last_update_eta = current_time
+            while len(self.time_hists) >= 2 and current_time - self.time_hists[0][0] > 15:
+                self.time_hists.pop(0)
+            if len(self.time_hists) >= 2:
+                eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
+            else:
+                eta = 1000000000
+            if eta >= 86400:
+                eta_str = "%d:" % (eta // 86400)
+                eta %= 86400
+            else:
+                eta_str = ""
+            eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
+            self.updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
 
     def save_callback(self, *args):
         audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
@@ -266,6 +283,9 @@ class Separator:
         self.overlap = overlap
         self.setAudioProgress = setAudioProgress
         self.setModelProgress = setModelProgress
+        self.file = file
+        self.time_hists = []
+        self.last_update_eta = 0
 
         try:
             self.updateStatus("Separating audio: %s" % file.name)
@@ -275,6 +295,7 @@ class Separator:
             wav_torch = torch.from_numpy(wav).clone().transpose(0, 1)
             src_channels = wav_torch.shape[0]
             logging.info("Running separation...")
+            self.time_hists.append((time.time(), 0))
             if src_channels != self.separator.model.audio_channels:
                 out = {}
                 for stem in self.separator.model.sources:
