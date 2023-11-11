@@ -18,7 +18,7 @@ import shared
 
 if not shared.use_PyQt6:
     from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
-    from PySide6.QtGui import QPainter
+    from PySide6.QtGui import QAction, QPainter
     from PySide6.QtWidgets import (
         QApplication,
         QLabel,
@@ -31,7 +31,7 @@ if not shared.use_PyQt6:
     )
 else:
     from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, Qt  # type: ignore
-    from PyQt6.QtGui import QPainter  # type: ignore
+    from PyQt6.QtGui import QAction, QPainter  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
         QLabel,
@@ -87,3 +87,9 @@ class ProgressDelegate(QStyledItemDelegate):
             fusion.drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
         else:
             QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+
+
+class Action(QAction):
+    def __init__(self, text, parent=None, callback=None):
+        super().__init__(text, parent)
+        self.triggered.connect(callback)

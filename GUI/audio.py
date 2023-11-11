@@ -18,6 +18,7 @@ import io
 import logging
 import os
 import shlex
+import shutil
 import soundfile
 import soxr
 import traceback
@@ -50,6 +51,7 @@ def checkFFMpeg():
         p = shared.Popen(["ffprobe", "-version"])
         out, _ = p.communicate()
         out = out.decode()
+        logging.info("Using ffmpeg from %s" % shutil.which("ffmpeg"))
         logging.info("ffprobe -version output:\n" + out)
         global ffmpeg_available, format_filter
         ffmpeg_available = True
@@ -92,12 +94,12 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
         raise NotImplementedError("FFmpeg is not available")
     if callable(update_status):
         update_status(f"Reading file metadata: {file.name if hasattr(file, 'name') else file}")
-    p = shared.Popen(["ffprobe", "-v", "warning", "-of", "xml", "-show_streams", "-show_format", str(file)])
+    p = shared.Popen(["ffprobe", "-v", "level+warning", "-of", "xml", "-show_streams", "-show_format", str(file)])
     logging.debug("ffprobe command: %s" % shlex.join(p.args))
     logging.info(p.communicate()[0].decode())
     if callable(update_status):
         update_status(f"Reading audio: {file.name if hasattr(file, 'name') else file}")
-    command = ["ffmpeg", "-v", "warning", "-i", str(file), "-map", "a:0"]
+    command = ["ffmpeg", "-v", "level+warning", "-i", str(file), "-map", "a:0"]
     if target_sr is not None:
         command += ["-ar", str(target_sr)]
     command += ["-c:a", "pcm_f32le", "-f", "wav", "-"]

@@ -132,7 +132,7 @@ An array of custom repos. This can be set inside the application (click on `adva
 
 type: `boolean`
 
-See [Some "useless" functions of separation queue](#Some-"useless"-functions-of-separation-queue) 3rd point.
+See [Some "useless" functions of separation queue](#Some-useless-functions-of-separation-queue) 3rd point.
 
 ## Q&A
 

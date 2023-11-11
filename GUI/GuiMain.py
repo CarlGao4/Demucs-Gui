@@ -37,6 +37,8 @@ if not shared.use_PyQt6:
         QLineEdit,
         QListWidget,
         QMainWindow,
+        QMenu,
+        QMenuBar,
         QMessageBox,
         QProgressBar,
         QPushButton,
@@ -70,6 +72,8 @@ else:
         QLineEdit,
         QListWidget,
         QMainWindow,
+        QMenu,
+        QMenuBar,
         QMessageBox,
         QProgressBar,
         QPushButton,
@@ -96,9 +100,10 @@ import sys
 import threading
 import time
 import traceback
+import webbrowser
 
 import separator
-from PySide6_modified import ModifiedQLabel, ProgressDelegate
+from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
 
 
 class StartingWindow(QMainWindow):
@@ -199,6 +204,19 @@ class MainWindow(QMainWindow):
         self.setStatusText.connect(self.setStatusTextFunc)
         self.timer.singleShot(50, self.showModelSelector)
 
+        self.menubar = QMenuBar()
+        self.menu_about = QMenu("About")
+        self.menu_about_about = Action(
+            "About Demucs GUI", self, lambda: self.showInfo.emit("About Demucs GUI %s" % __version__, LICENSE)
+        )
+        self.menu_about_usage = Action(
+            "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
+        )
+        self.menu_about_log = Action("Open log", self, self.open_log)
+        self.menu_about.addActions([self.menu_about_about, self.menu_about_usage, self.menu_about_log])
+        self.menubar.addAction(self.menu_about.menuAction())
+        self.setMenuBar(self.menubar)
+
     def showModelSelector(self):
         self.model_selector = ModelSelector()
         self.hlayout1.addWidget(self.model_selector, 16)
@@ -256,6 +274,27 @@ class MainWindow(QMainWindow):
 
     def setStatusTextFunc(self, text):
         self.statusBar().showMessage(text)
+
+    def open_log(self):
+        if sys.platform == "win32":
+            os.startfile(str(shared.logfile))
+        elif sys.platform == "darwin":
+            os.system("open " + str(shared.logfile))
+        else:
+            try:
+                os.system("xdg-open " + str(shared.logfile))
+            except:
+                if (
+                    self.m.question(
+                        self,
+                        "Open log failed",
+                        "Failed to open log file. Do you want to copy the path?",
+                        self.m.StandardButton.Yes,
+                        self.m.StandardButton.No,
+                    )
+                    == self.m.StandardButton.Yes
+                ):
+                    QApplication.clipboard().setText(str(shared.logfile))
 
 
 class ModelSelector(QGroupBox):
