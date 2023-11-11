@@ -1,17 +1,17 @@
 LICENSE = """Demucs-GUI 1.0
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
+This program is free software: you can redistribute it and/or modify \
+it under the terms of the GNU General Public License as published by \
+the Free Software Foundation, either version 3 of the License, or \
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+This program is distributed in the hope that it will be useful, \
+but WITHOUT ANY WARRANTY; without even the implied warranty of \
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the \
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
 __version__ = "1.0"
@@ -207,8 +207,9 @@ class MainWindow(QMainWindow):
         self.menubar = QMenuBar()
         self.menu_about = QMenu("About")
         self.menu_about_about = Action(
-            "About Demucs GUI", self, lambda: self.showInfo.emit("About Demucs GUI %s" % __version__, LICENSE)
+            "About Demucs GUI", self, lambda: self.showInfoFunc("About Demucs GUI %s" % __version__, LICENSE)
         )
+        self.menu_about_about.setMenuRole(Action.MenuRole.NoRole)
         self.menu_about_usage = Action(
             "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
         )
