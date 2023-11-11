@@ -97,7 +97,6 @@ import platform
 import psutil
 import random
 import sys
-import threading
 import time
 import traceback
 import webbrowser
@@ -152,11 +151,8 @@ class StartingWindow(QMainWindow):
 
         self.finish_sgn.connect(self.finish)
 
-        self.start_thread = threading.Thread(
-            target=separator.starter, args=(self.status.setText, self.finish_sgn.emit), daemon=True
-        )
         self.start_time = time.perf_counter()
-        self.start_thread.start()
+        separator.starter(self.status.setText, self.finish_sgn.emit)
 
     def increaseOpacity(self):
         if self.opacity >= 1:
@@ -248,7 +244,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if (
             (not hasattr(self, "separator"))
-            or (not self.separator.separating)
+            or (not (self.separator.separating or self.save_options.saving))
             or (
                 self.m.question(
                     self,
@@ -356,10 +352,8 @@ class ModelSelector(QGroupBox):
         self.select_combobox.addItems(self.models)
         self.setEnabled(True)
 
+    @shared.thread_wrapper
     def loadModel(self):
-        threading.Thread(target=self.loadModelThread, daemon=True).start()
-
-    def loadModelThread(self):
         global main_window
 
         self.setEnabled(False)
@@ -642,12 +636,17 @@ class SaveOptions(QGroupBox):
 
         self.setLayout(self.widget_layout)
 
+        self.saving = 0
+
     def browseLocation(self):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
             self.loc_input.setText(p)
 
-    def save(self, file, tensor, save_func):
+    @shared.thread_wrapper
+    def save(self, file, tensor, save_func, item, finishCallback):
+        self.saving += 1
+        finishCallback(shared.FileStatus.Writing, item)
         for stem, stem_data in tensor.items():
             file_path_str = self.loc_input.text().format(
                 track=file.stem,
@@ -668,6 +667,8 @@ class SaveOptions(QGroupBox):
                 data = stem_data
             file_path.parent.mkdir(parents=True, exist_ok=True)
             save_func(file_path, data, self.sample_fmt.currentData())
+        self.saving -= 1
+        finishCallback(shared.FileStatus.Finished, item)
 
 
 class FileQueue(QGroupBox):
@@ -978,10 +979,14 @@ class SeparationControl(QGroupBox):
             item.setData(ProgressDelegate.TextRole, "Cancelled")
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Cancelled])
             item.setData(ProgressDelegate.ProgressRole, 0)
+        elif status == shared.FileStatus.Writing:
+            item.setData(ProgressDelegate.TextRole, "Writing")
+            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
         if self.stop_now:
             self.stop_now = False
-        self.start_button.setEnabled(True)
-        self.startSeparateSignal.emit()
+        if status != shared.FileStatus.Finished:
+            self.start_button.setEnabled(True)
+            self.startSeparateSignal.emit()
 
     def startSeparation(self):
         global main_window
@@ -992,6 +997,7 @@ class SeparationControl(QGroupBox):
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
             main_window.setStatusText.emit("No more file to separate")
+            separator.empty_cuda_cache()
             return
         file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
         item = main_window.file_queue.table.item(index, 1)

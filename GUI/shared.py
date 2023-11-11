@@ -21,6 +21,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import threading
 import traceback
 
 
@@ -118,3 +119,28 @@ def Popen(*args, **kwargs):
     kwargs["stdout"] = subprocess.PIPE
     kwargs["stderr"] = subprocess.PIPE
     return subprocess.Popen(*args, **kwargs)
+
+
+def thread_wrapper(func):
+    if not hasattr(thread_wrapper, "index"):
+        thread_wrapper.index = 0
+
+    def wrapper(*args, **kwargs):
+        thread_wrapper.index += 1
+
+        def run_and_log(idx=thread_wrapper.index):
+            logging.info(
+                "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+            )
+            try:
+                func(*args, **kwargs)
+            finally:
+                logging.info(
+                    "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                )
+
+        t = threading.Thread(target=run_and_log, daemon=True)
+        t.start()
+        return t
+
+    return wrapper

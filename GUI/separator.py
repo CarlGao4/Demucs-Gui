@@ -19,7 +19,6 @@ import pathlib
 import platform
 import psutil
 import sys
-import threading
 import time
 import traceback
 import typing as tp
@@ -30,8 +29,10 @@ import shared
 
 
 default_device = 0
+used_cuda = False
 
 
+@shared.thread_wrapper
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
     global torch, demucs, audio
     import torch
@@ -134,6 +135,12 @@ def autoListModels():
     return models, infos, each_repos
 
 
+def empty_cuda_cache():
+    if used_cuda:
+        for _ in range(10):
+            torch.cuda.empty_cache()
+
+
 class Separator:
     def __init__(
         self,
@@ -198,7 +205,7 @@ class Separator:
         if self.separating:
             return
         self.separating = True
-        threading.Thread(target=self.separate, args=args, kwargs=kwargs, daemon=True).start()
+        self.separate(*args, **kwargs)
 
     def updateProgress(self, progress_dict):
         progress = Fraction(0)
@@ -223,6 +230,7 @@ class Separator:
     def save_callback(self, *args):
         audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
 
+    @shared.thread_wrapper
     def separate(
         self,
         file,
@@ -240,6 +248,9 @@ class Separator:
         logging.info("Start separating audio: %s" % file.name)
         logging.info("Parameters: segment=%.2f overlap=%.2f shifts=%d" % (segment, overlap, shifts))
         logging.info("Device: %s" % device)
+        global used_cuda
+        if device.startswith("cuda"):
+            used_cuda = True
         try:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
@@ -290,8 +301,6 @@ class Separator:
             self.separating = False
             return
         logging.info("Saving separated audio...")
-        save_callback(file, out, self.save_callback)
-        self.updateStatus(f"Successfully separated audio {file.name}")
-        finishCallback(shared.FileStatus.Finished, item)
+        save_callback(file, out, self.save_callback, item, finishCallback)
         self.separating = False
         return
