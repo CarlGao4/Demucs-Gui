@@ -1,51 +1,92 @@
 LICENSE = """Demucs-GUI 1.0
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
+This program is free software: you can redistribute it and/or modify \
+it under the terms of the GNU General Public License as published by \
+the Free Software Foundation, either version 3 of the License, or \
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+This program is distributed in the hope that it will be useful, \
+but WITHOUT ANY WARRANTY; without even the implied warranty of \
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the \
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
-__version__ = "1.0a1"
+__version__ = "1.0"
 
-from PySide6 import QtGui
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QApplication,
-    QButtonGroup,
-    QComboBox,
-    QDialog,
-    QDoubleSpinBox,
-    QFileDialog,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QMainWindow,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QSlider,
-    QSpinBox,
-    QStatusBar,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+import shared
+
+if not shared.use_PyQt6:
+    from PySide6 import QtGui
+    from PySide6.QtCore import Qt, QTimer, Signal
+    from PySide6.QtWidgets import (
+        QAbstractItemView,
+        QApplication,
+        QButtonGroup,
+        QComboBox,
+        QDialog,
+        QDoubleSpinBox,
+        QFileDialog,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QHeaderView,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMainWindow,
+        QMenu,
+        QMenuBar,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QRadioButton,
+        QSlider,
+        QSpinBox,
+        QStatusBar,
+        QStyleFactory,
+        QTableWidget,
+        QTableWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
+else:
+    from PyQt6 import QtGui  # type: ignore
+    from PyQt6.QtCore import Qt, QTimer  # type: ignore
+    from PyQt6.QtCore import pyqtSignal as Signal  # type: ignore
+    from PyQt6.QtWidgets import (  # type: ignore
+        QAbstractItemView,
+        QApplication,
+        QButtonGroup,
+        QComboBox,
+        QDialog,
+        QDoubleSpinBox,
+        QFileDialog,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QHeaderView,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMainWindow,
+        QMenu,
+        QMenuBar,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QRadioButton,
+        QSlider,
+        QSpinBox,
+        QStatusBar,
+        QStyleFactory,
+        QTableWidget,
+        QTableWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
 
 import datetime
 import logging
@@ -56,13 +97,12 @@ import platform
 import psutil
 import random
 import sys
-import threading
 import time
 import traceback
+import webbrowser
 
 import separator
-import shared
-from PySide6_modified import ModifiedQLabel, ProgressDelegate
+from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
 
 
 class StartingWindow(QMainWindow):
@@ -111,11 +151,8 @@ class StartingWindow(QMainWindow):
 
         self.finish_sgn.connect(self.finish)
 
-        self.start_thread = threading.Thread(
-            target=separator.starter, args=(self.status.setText, self.finish_sgn.emit), daemon=True
-        )
         self.start_time = time.perf_counter()
-        self.start_thread.start()
+        separator.starter(self.status.setText, self.finish_sgn.emit)
 
     def increaseOpacity(self):
         if self.opacity >= 1:
@@ -133,7 +170,7 @@ class StartingWindow(QMainWindow):
         main_window = MainWindow()
         main_window.show()
         self.hide()
-        main_window.statusBar().showMessage("Startup took %.3fs" % (self.end_time - self.start_time - paused_time))
+        main_window.setStatusText.emit("Startup took %.3fs" % (self.end_time - self.start_time - paused_time))
 
 
 class MainWindow(QMainWindow):
@@ -141,6 +178,7 @@ class MainWindow(QMainWindow):
     showInfo = Signal(str, str)
     showWarning = Signal(str, str)
     showParamSettings = Signal()
+    setStatusText = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -159,7 +197,22 @@ class MainWindow(QMainWindow):
         self.showInfo.connect(self.showInfoFunc)
         self.showWarning.connect(self.showWarningFunc)
         self.showParamSettings.connect(self.showParamSettingsFunc)
+        self.setStatusText.connect(self.setStatusTextFunc)
         self.timer.singleShot(50, self.showModelSelector)
+
+        self.menubar = QMenuBar()
+        self.menu_about = QMenu("About")
+        self.menu_about_about = Action(
+            "About Demucs GUI", self, lambda: self.showInfoFunc("About Demucs GUI %s" % __version__, LICENSE)
+        )
+        self.menu_about_about.setMenuRole(Action.MenuRole.NoRole)
+        self.menu_about_usage = Action(
+            "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
+        )
+        self.menu_about_log = Action("Open log", self, self.open_log)
+        self.menu_about.addActions([self.menu_about_about, self.menu_about_usage, self.menu_about_log])
+        self.menubar.addAction(self.menu_about.menuAction())
+        self.setMenuBar(self.menubar)
 
     def showModelSelector(self):
         self.model_selector = ModelSelector()
@@ -179,7 +232,7 @@ class MainWindow(QMainWindow):
 
     def loadModel(self, model, repo):
         try:
-            self.separator = separator.Separator(model, repo, self.statusBar().showMessage)
+            self.separator = separator.Separator(model, repo, self.setStatusText.emit)
         except:
             logging.error(
                 "Failed to load model %s from %s:\n%s"
@@ -187,6 +240,25 @@ class MainWindow(QMainWindow):
             )
             return False
         return True
+
+    def closeEvent(self, event):
+        if (
+            (not hasattr(self, "separator"))
+            or (not (self.separator.separating or self.save_options.saving))
+            or (
+                self.m.question(
+                    self,
+                    "Separation in progress",
+                    "Separation is not finished, quit anyway?",
+                    self.m.StandardButton.Yes,
+                    self.m.StandardButton.Cancel,
+                )
+                == self.m.StandardButton.Yes
+            )
+        ):
+            return super().closeEvent(event)
+        else:
+            event.ignore()
 
     def showErrorFunc(self, title, text):
         self.m.critical(self, title, text)
@@ -196,6 +268,30 @@ class MainWindow(QMainWindow):
 
     def showWarningFunc(self, title, text):
         self.m.warning(self, title, text)
+
+    def setStatusTextFunc(self, text):
+        self.statusBar().showMessage(text)
+
+    def open_log(self):
+        if sys.platform == "win32":
+            os.startfile(str(shared.logfile))
+        elif sys.platform == "darwin":
+            os.system("open " + str(shared.logfile))
+        else:
+            try:
+                os.system("xdg-open " + str(shared.logfile))
+            except:
+                if (
+                    self.m.question(
+                        self,
+                        "Open log failed",
+                        "Failed to open log file. Do you want to copy the path?",
+                        self.m.StandardButton.Yes,
+                        self.m.StandardButton.No,
+                    )
+                    == self.m.StandardButton.Yes
+                ):
+                    QApplication.clipboard().setText(str(shared.logfile))
 
 
 class ModelSelector(QGroupBox):
@@ -256,10 +352,8 @@ class ModelSelector(QGroupBox):
         self.select_combobox.addItems(self.models)
         self.setEnabled(True)
 
+    @shared.thread_wrapper
     def loadModel(self):
-        threading.Thread(target=self.loadModelThread, daemon=True).start()
-
-    def loadModelThread(self):
         global main_window
 
         self.setEnabled(False)
@@ -270,7 +364,7 @@ class ModelSelector(QGroupBox):
         logging.info(
             "Loading model %s from repo %s" % (model_name, model_repo if model_repo is not None else '"remote"')
         )
-        main_window.statusBar().showMessage("Loading model %s" % model_name)
+        main_window.setStatusText.emit("Loading model %s" % model_name)
 
         start_time = time.perf_counter()
         success = main_window.loadModel(model_name, model_repo)
@@ -287,7 +381,7 @@ class ModelSelector(QGroupBox):
         model_info = main_window.separator.modelInfo()
         main_window.model_selector.model_info.setText(model_info)
         self.model_info.setMinimumHeight(self.model_info.heightForWidth(400))
-        main_window.statusBar().showMessage("Model loaded within %.4fs" % (end_time - start_time))
+        main_window.setStatusText.emit("Model loaded within %.4fs" % (end_time - start_time))
         main_window.showParamSettings.emit()
         logging.info("Model loaded within %.4fs" % (end_time - start_time))
         logging.info(model_info)
@@ -542,12 +636,17 @@ class SaveOptions(QGroupBox):
 
         self.setLayout(self.widget_layout)
 
+        self.saving = 0
+
     def browseLocation(self):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
             self.loc_input.setText(p)
 
-    def save(self, file, tensor, save_func):
+    @shared.thread_wrapper
+    def save(self, file, tensor, save_func, item, finishCallback):
+        self.saving += 1
+        finishCallback(shared.FileStatus.Writing, item)
         for stem, stem_data in tensor.items():
             file_path_str = self.loc_input.text().format(
                 track=file.stem,
@@ -568,6 +667,8 @@ class SaveOptions(QGroupBox):
                 data = stem_data
             file_path.parent.mkdir(parents=True, exist_ok=True)
             save_func(file_path, data, self.sample_fmt.currentData())
+        self.saving -= 1
+        finishCallback(shared.FileStatus.Finished, item)
 
 
 class FileQueue(QGroupBox):
@@ -618,7 +719,9 @@ class FileQueue(QGroupBox):
         self.add_files_button = QPushButton()
         self.add_files_button.setText("Add files")
         self.add_files_button.clicked.connect(
-            lambda: self.addFiles(QFileDialog.getOpenFileNames(main_window, "Add files to queue")[0])
+            lambda: self.addFiles(
+                QFileDialog.getOpenFileNames(main_window, "Add files to queue", filter=separator.audio.format_filter)[0]
+            )
         )
 
         self.remove_files_button = QPushButton()
@@ -865,7 +968,7 @@ class SeparationControl(QGroupBox):
         if status == shared.FileStatus.Finished:
             item.setData(ProgressDelegate.TextRole, "Finished")
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Finished])
-            main_window.statusBar().showMessage(
+            main_window.setStatusText.emit(
                 "Separation finished: %s" % main_window.file_queue.table.item(item.row(), 0).text()
             )
         elif status == shared.FileStatus.Failed:
@@ -876,10 +979,14 @@ class SeparationControl(QGroupBox):
             item.setData(ProgressDelegate.TextRole, "Cancelled")
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Cancelled])
             item.setData(ProgressDelegate.ProgressRole, 0)
+        elif status == shared.FileStatus.Writing:
+            item.setData(ProgressDelegate.TextRole, "Writing")
+            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
         if self.stop_now:
             self.stop_now = False
-        self.start_button.setEnabled(True)
-        self.startSeparateSignal.emit()
+        if status != shared.FileStatus.Finished:
+            self.start_button.setEnabled(True)
+            self.startSeparateSignal.emit()
 
     def startSeparation(self):
         global main_window
@@ -889,6 +996,8 @@ class SeparationControl(QGroupBox):
         index = main_window.file_queue.getFirstQueued()
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
+            main_window.setStatusText.emit("No more file to separate")
+            separator.empty_cuda_cache()
             return
         file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
         item = main_window.file_queue.table.item(index, 1)
@@ -966,5 +1075,10 @@ if __name__ == "__main__":
     app = QApplication([])
     starting_window = StartingWindow()
     starting_window.show()
+    logging.debug("Supported styles: %s" % ", ".join(QStyleFactory.keys()))
+    style_setting = shared.GetSetting("style", app.style().objectName())
+    if style_setting.lower() in [i.lower() for i in QStyleFactory.keys()]:
+        app.setStyle(QStyleFactory.create(style_setting))
+    logging.debug("Current style: %s" % app.style().objectName())
 
     app.exec()

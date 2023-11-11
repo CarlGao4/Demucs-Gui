@@ -14,19 +14,38 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
-from PySide6.QtGui import QPainter
-from PySide6.QtWidgets import (
-    QApplication,
-    QLabel,
-    QStyle,
-    QStyledItemDelegate,
-    QStyleOption,
-    QStyleOptionProgressBar,
-    QStyleOptionViewItem,
-)
+import shared
+
+if not shared.use_PyQt6:
+    from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
+    from PySide6.QtGui import QAction, QPainter
+    from PySide6.QtWidgets import (
+        QApplication,
+        QLabel,
+        QStyle,
+        QStyleFactory,
+        QStyledItemDelegate,
+        QStyleOption,
+        QStyleOptionProgressBar,
+        QStyleOptionViewItem,
+    )
+else:
+    from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, Qt  # type: ignore
+    from PyQt6.QtGui import QAction, QPainter  # type: ignore
+    from PyQt6.QtWidgets import (  # type: ignore
+        QApplication,
+        QLabel,
+        QStyle,
+        QStyleFactory,
+        QStyledItemDelegate,
+        QStyleOption,
+        QStyleOptionProgressBar,
+        QStyleOptionViewItem,
+    )
 
 from typing import Union
+
+import sys
 
 
 class ModifiedQLabel(QLabel):
@@ -52,16 +71,25 @@ class ProgressDelegate(QStyledItemDelegate):
     TextRole = Qt.ItemDataRole.UserRole + 0x1001
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]):
-        progress = int(index.data(self.ProgressRole) * 1000)
+        progress = int(index.data(self.ProgressRole) * 10000)
         opt = QStyleOptionProgressBar()
         opt.rect = option.rect  # type: ignore
         opt.minimum = 0  # type: ignore
-        opt.maximum = 1000  # type: ignore
+        opt.maximum = 10000  # type: ignore
         opt.progress = progress  # type: ignore
         opt.textAlignment = Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter  # type: ignore
         if t := index.data(self.TextRole):
             opt.text = t  # type: ignore
         else:
-            opt.text = "%.1f%%" % (progress / 10)  # type: ignore
+            opt.text = "%.1f%%" % (progress / 100)  # type: ignore
         opt.textVisible = True  # type: ignore
-        QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+        if sys.platform == "darwin" and ((fusion := QStyleFactory.create("Fusion")) is not None):
+            fusion.drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+        else:
+            QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+
+
+class Action(QAction):
+    def __init__(self, text, parent=None, callback=None):
+        super().__init__(text, parent)
+        self.triggered.connect(callback)

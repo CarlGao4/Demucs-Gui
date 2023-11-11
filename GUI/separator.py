@@ -19,7 +19,6 @@ import pathlib
 import platform
 import psutil
 import sys
-import threading
 import time
 import traceback
 import typing as tp
@@ -30,8 +29,10 @@ import shared
 
 
 default_device = 0
+used_cuda = False
 
 
+@shared.thread_wrapper
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
     global torch, demucs, audio
     import torch
@@ -74,6 +75,9 @@ def getAvailableDevices():
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():
             devices.append(("MPS (%d MiB)" % (psutil.virtual_memory().total / 1048576), "mps"))
             default_device = 1
+            logging.info("MPS backend is available")
+        else:
+            logging.info("MPS backend is not available")
     else:
         if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0
@@ -127,8 +131,14 @@ def autoListModels():
                 info += "\nRepo: " + str(repopath)
                 info += "\nFile: " + str(filepath)
             singles.append((sig, info, repopath))
-    models, infos, each_repos = tuple(zip(*(bags + singles)))
+    models, infos, each_repos = tuple(zip(*(bags + singles + [("demucs_unittest", "Unit test model", None)])))
     return models, infos, each_repos
+
+
+def empty_cuda_cache():
+    if used_cuda:
+        for _ in range(10):
+            torch.cuda.empty_cache()
 
 
 class Separator:
@@ -195,7 +205,7 @@ class Separator:
         if self.separating:
             return
         self.separating = True
-        threading.Thread(target=self.separate, args=args, kwargs=kwargs, daemon=True).start()
+        self.separate(*args, **kwargs)
 
     def updateProgress(self, progress_dict):
         progress = Fraction(0)
@@ -216,10 +226,28 @@ class Separator:
         progress += Fraction(self.out_length, self.in_length)
         self.setModelProgress(min(1.0, float(progress_shift)))
         self.setAudioProgress(min(1.0, float(progress)), self.item)
+        current_time = time.time()
+        self.time_hists.append((current_time, progress))
+        if current_time - self.last_update_eta > 1:
+            self.last_update_eta = current_time
+            while len(self.time_hists) >= 10 and current_time - self.time_hists[0][0] > 15:
+                self.time_hists.pop(0)
+            if len(self.time_hists) >= 2:
+                eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
+            else:
+                eta = 1000000000
+            if eta >= 86400:
+                eta_str = "%d:" % (eta // 86400)
+                eta %= 86400
+            else:
+                eta_str = ""
+            eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
+            self.updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
 
     def save_callback(self, *args):
         audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
 
+    @shared.thread_wrapper
     def separate(
         self,
         file,
@@ -234,9 +262,16 @@ class Separator:
         setStatus: tp.Callable[[tp.Any, int], None],
         finishCallback: tp.Callable[[int, tp.Any], None],
     ):
+        logging.info("Start separating audio: %s" % file.name)
+        logging.info("Parameters: segment=%.2f overlap=%.2f shifts=%d" % (segment, overlap, shifts))
+        logging.info("Device: %s" % device)
+        global used_cuda
+        if device.startswith("cuda"):
+            used_cuda = True
         try:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
+            assert wav is not None
         except:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
@@ -248,6 +283,9 @@ class Separator:
         self.overlap = overlap
         self.setAudioProgress = setAudioProgress
         self.setModelProgress = setModelProgress
+        self.file = file
+        self.time_hists = []
+        self.last_update_eta = 0
 
         try:
             self.updateStatus("Separating audio: %s" % file.name)
@@ -256,6 +294,8 @@ class Separator:
             )
             wav_torch = torch.from_numpy(wav).clone().transpose(0, 1)
             src_channels = wav_torch.shape[0]
+            logging.info("Running separation...")
+            self.time_hists.append((time.time(), 0))
             if src_channels != self.separator.model.audio_channels:
                 out = {}
                 for stem in self.separator.model.sources:
@@ -281,8 +321,7 @@ class Separator:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
             return
-        save_callback(file, out, self.save_callback)
-        self.updateStatus(f"Successfully separated audio {file.name}")
-        finishCallback(shared.FileStatus.Finished, item)
+        logging.info("Saving separated audio...")
+        save_callback(file, out, self.save_callback, item, finishCallback)
         self.separating = False
         return

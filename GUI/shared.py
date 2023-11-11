@@ -19,19 +19,18 @@ import json
 import logging
 import os
 import pathlib
+import subprocess
 import sys
+import threading
 import traceback
 
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
 debug = False
+use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
 if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)
-
-if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
-    import ctypes
-    ctypes.windll.kernel32.FreeConsole()
 
 save_loc_syntax = """You can use variables to rename your output file.
 Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
@@ -111,3 +110,37 @@ class FileStatus:
     Finished = 5
     Failed = 6
     Cancelled = 7
+
+
+def Popen(*args, **kwargs):
+    """A wrapper of `subprocess.Popen` to hide console window on Windows and redirect stdout and stderr to PIPE"""
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    kwargs["stdout"] = subprocess.PIPE
+    kwargs["stderr"] = subprocess.PIPE
+    return subprocess.Popen(*args, **kwargs)
+
+
+def thread_wrapper(func):
+    if not hasattr(thread_wrapper, "index"):
+        thread_wrapper.index = 0
+
+    def wrapper(*args, **kwargs):
+        thread_wrapper.index += 1
+
+        def run_and_log(idx=thread_wrapper.index):
+            logging.info(
+                "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+            )
+            try:
+                func(*args, **kwargs)
+            finally:
+                logging.info(
+                    "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                )
+
+        t = threading.Thread(target=run_and_log, daemon=True)
+        t.start()
+        return t
+
+    return wrapper

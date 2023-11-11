@@ -30,7 +30,7 @@ For Linux: Any system that can install and run python 3.11 (Because I'll pack th
 #### Hardware
 Memory: About at least 8GB of total memory (physical and swap) would be required. The longer the track you want to separate, the more memory will be required.
 
-GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5) and Apple MPS are supported. At least 2GB of **private memory** (not shared memory) is required.
+GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5) and Apple MPS are supported. At least 2GB of private memory is required.
 
 ### Running the codes yourself
 At least Python 3.9 is required. Other requirements please refer to [Installing binaries](#installing-binaries).
@@ -47,6 +47,15 @@ Please refer to [history.md](history.md).
 **If you are using released binaries, please refer to [usage.md](usage.md)**
 
 *This part is written for beta versions*
+
+<details>
+  <summary>For macOS ARM64 users: There is a bug related to Qt causing crash. To avoid it, please run Python x86_64 using Rosetta 2.</summary>
+
+According to [Apple Developer Forums](https://developer.apple.com/forums/thread/729355), the crash is caused by manipulating the GUI from a thread other than the main thread. This is exactly what Demucs GUI does: the separation process is time-consuming, so it is run in a separate thread to avoid causing the main window to stop responding. This thread will manipulate the GUI to update the progress bar and retrieve separation parameters from time to time.
+
+But it's strange that the crash only happens on Apple Silicon Macs. Besides, Demucs GUI manipulates the GUI from a separate thread more than once, but the crash only happens when loading a model if you've chosen another model (as long as you've opened the drop-down menu for choosing models even if you didn't choose another model). So the solution is to run Python x86_64 using Rosetta 2, or wait for the bug to be fixed.
+
+</details>
 
 ### CPU only or Apple MPS
 1. Install Python (and git if you'd like to clone this repository) to your system.

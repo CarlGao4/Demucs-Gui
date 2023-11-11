@@ -1,15 +1,55 @@
-Note: Versions in *italic* means that the release is a beta version. 
+Note: Versions in *italic* means that the release is a beta version.
+
+### 1.0
+Release date: Nov. 11, 2023
+
+#### Updates
+1. Read with FFMpeg (which allows separating more file formats, even extracting audio track from a video and separate it)
+2. Save files with multithread to avoid waiting between tracks
+3. Show ETA
+4. Ask before quitting if separating else exits (Yes, this is a conditional expressions)
+5. Logging more separating parameters
+6. Allow changing window style using settings.json
+7. Allow PyQt6 as backend (though packed binaries will not use it. You can use it by modifying shared.py)
+8. Add demucs_unittest model
+9. Add menu bar
+
+#### Fixes
+1. Use absolute path for font
+2. Fixed init error of mps
+3. Fix sometimes progress goes back
+4. Force separation queue using Fusion style on macOS to show progress bar
+
+### *1.0a1*
+Release date: Oct. 6, 2023
+
+#### Updates
+1. Rewritten GUI with PySide6 (Qt)
+2. Listing model support
+3. Getting model details
+4. Multi-channel support - separate each channel one by one and combine them back
+5. Separation queue support - automatically separate each song one by one
+6. Drag & Drop support - simply drag folders or files into the queue window and will be added to queue
+7. Progress bar
+8. More save options - flac/wav, clamp/rescale, int16/int24/float32
+
+#### Known issues
+1. Waiting for documentation! Everybody is welcome to contribute! (#23)
+2. May causes waiting for long time when loading a remote model for the first time
+3. No ffmpeg support though I've added ffmpeg detection
+4. **[ADDED]** **[FIXED]** Packed binaries can't use remote models
+5. **[ADDED]** macOS can’t start up due to relative path
 
 ### 0.1
 Release date: Jun. 22, 2022
 
-### Updates
+#### Updates
 1. Solved mono audio reading issue
 2. Now you can type in the numbers of splits and overlap. 
 3. Windows now can read ogg and mp3 files. 
 4. Increase log level
 
-### Known issues
+#### Known issues
 1. FFMpeg is still not available
 2. On macOS, reading of mp3 files is not available. We are waiting the 0.11.0 release of python-soundfile.
 

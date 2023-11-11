@@ -14,35 +14,48 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import io
 import logging
 import os
+import shlex
+import shutil
 import soundfile
 import soxr
-import subprocess
 import traceback
 import typing as tp
 
 import shared
 
-os.environ["PATH"] += os.pathsep + str(shared.homeDir / "ffmpeg")
+if shared.GetSetting("prepend_ffmpeg_path", False):
+    os.environ["PATH"] += os.pathsep + str(shared.homeDir / "ffmpeg")
+else:
+    os.environ["PATH"] = str(shared.homeDir / "ffmpeg") + os.pathsep + os.environ["PATH"]
 
 logging.info("Soundfile version: %s" % soundfile.__version__)
 logging.info("libsndfile version: %s" % soundfile.__libsndfile_version__)
 logging.info("SoXR version: %s" % soxr.__version__)
 logging.info("libsoxr version: %s" % soxr.__libsoxr_version__)
 
+ffmpeg_available = False
+
+format_filter = "libsndfile (%s)" % " ".join(f"*.{format}".lower() for format in soundfile.available_formats().keys())
+
 
 def checkFFMpeg():
     try:
-        p = subprocess.Popen(["ffmpeg", "-version"], stdout=subprocess.PIPE)
+        p = shared.Popen(["ffmpeg", "-version"])
         out, _ = p.communicate()
         out = out.decode()
         logging.info("ffmpeg -version output:\n" + out)
         ffmpeg_version = out.strip().splitlines()[0].strip()
-        p = subprocess.Popen(["ffprobe", "-version"], stdout=subprocess.PIPE)
+        p = shared.Popen(["ffprobe", "-version"])
         out, _ = p.communicate()
         out = out.decode()
+        logging.info("Using ffmpeg from %s" % shutil.which("ffmpeg"))
         logging.info("ffprobe -version output:\n" + out)
+        global ffmpeg_available, format_filter
+        ffmpeg_available = True
+        format_filter += ";;All types (*.*)"
         return ffmpeg_version
     except:
         logging.warning("FFMpeg cannot start:\n" + traceback.format_exc())
@@ -50,19 +63,57 @@ def checkFFMpeg():
 
 
 def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
+    logging.debug("Reading audio with soundfile: %s" % file)
+    try:
+        return read_audio_soundfile(file, target_sr, update_status)
+    except soundfile.LibsndfileError:
+        logging.error("Failed to read with soundfile:\n" + traceback.format_exc())
+    logging.debug("Reading audio with ffmpeg: %s" % file)
+    try:
+        return read_audio_ffmpeg(file, target_sr, update_status)
+    except shared.subprocess.CalledProcessError:
+        logging.error("Failed to read with ffmpeg:\n" + traceback.format_exc())
+
+
+def read_audio_soundfile(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
     if callable(update_status):
         update_status(f"Reading audio: {file.name if hasattr(file, 'name') else file}")
-    try:
-        audio, sr = soundfile.read(file, dtype="float32", always_2d=True)
-    except soundfile.LibsndfileError:
-        logging.error(f"Failed to read file {file}:\n" + traceback.format_exc())
-        return
+    audio, sr = soundfile.read(file, dtype="float32", always_2d=True)
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
+    assert audio.shape[0] > 0, "Audio is empty"
     if target_sr is not None and sr != target_sr:
         logging.info(f"Samplerate {sr} doesn't match target {target_sr}, resampling with SoXR")
         if callable(update_status):
             update_status("Resampling audio")
         audio = soxr.resample(audio, sr, target_sr, "VHQ")
+    return audio
+
+
+def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
+    if not ffmpeg_available:
+        raise NotImplementedError("FFmpeg is not available")
+    if callable(update_status):
+        update_status(f"Reading file metadata: {file.name if hasattr(file, 'name') else file}")
+    p = shared.Popen(["ffprobe", "-v", "level+warning", "-of", "xml", "-show_streams", "-show_format", str(file)])
+    logging.debug("ffprobe command: %s" % shlex.join(p.args))
+    logging.info(p.communicate()[0].decode())
+    if callable(update_status):
+        update_status(f"Reading audio: {file.name if hasattr(file, 'name') else file}")
+    command = ["ffmpeg", "-v", "level+warning", "-i", str(file), "-map", "a:0"]
+    if target_sr is not None:
+        command += ["-ar", str(target_sr)]
+    command += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
+    p = shared.Popen(command)
+    logging.debug("ffmpeg command: %s" % shlex.join(p.args))
+    wav_buffer = io.BytesIO()
+    wav_buffer.write(p.stdout.read())
+    wav_buffer.seek(0)
+    ffmpeg_log = p.stderr.read().decode()
+    if ffmpeg_log:
+        logging.debug(p.stderr.read().decode())
+    audio, sr = soundfile.read(wav_buffer, dtype="float32", always_2d=True)
+    logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
+    assert audio.shape[0] > 0, "Audio is empty"
     return audio
 
 
