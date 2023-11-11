@@ -230,7 +230,7 @@ class Separator:
         self.time_hists.append((current_time, progress))
         if current_time - self.last_update_eta > 1:
             self.last_update_eta = current_time
-            while len(self.time_hists) >= 2 and current_time - self.time_hists[0][0] > 15:
+            while len(self.time_hists) >= 10 and current_time - self.time_hists[0][0] > 15:
                 self.time_hists.pop(0)
             if len(self.time_hists) >= 2:
                 eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
