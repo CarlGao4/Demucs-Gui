@@ -1,5 +1,25 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.0
+Release date: Nov. 11, 2023
+
+#### Updates
+1. Read with FFMpeg (which allows separating more file formats, even extracting audio track from a video and separate it)
+2. Save files with multithread to avoid waiting between tracks
+3. Show ETA
+4. Ask before quitting if separating else exits (Yes, this is a conditional expressions)
+5. Logging more separating parameters
+6. Allow changing window style using settings.json
+7. Allow PyQt6 as backend (though packed binaries will not use it. You can use it by modifying shared.py)
+8. Add demucs_unittest model
+9. Add menu bar
+
+#### Fixes
+1. Use absolute path for font
+2. Fixed init error of mps
+3. Fix sometimes progress goes back
+4. Force separation queue using Fusion style on macOS to show progress bar
+
 ### *1.0a1*
 Release date: Oct. 6, 2023
 
