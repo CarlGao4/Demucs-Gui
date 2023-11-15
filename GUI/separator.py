@@ -32,7 +32,7 @@ default_device = 0
 used_cuda = False
 
 
-@shared.thread_wrapper
+@shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
     global torch, demucs, audio
     import torch
@@ -229,25 +229,27 @@ class Separator:
         current_time = time.time()
         self.time_hists.append((current_time, progress))
         if current_time - self.last_update_eta > 1:
-            self.last_update_eta = current_time
-            while len(self.time_hists) >= 10 and current_time - self.time_hists[0][0] > 15:
+            while len(self.time_hists) >= 20 and current_time - self.time_hists[0][0] > 15:
                 self.time_hists.pop(0)
-            if len(self.time_hists) >= 2:
+            if len(self.time_hists) >= 2 and progress != self.time_hists[0][1]:
                 eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
             else:
                 eta = 1000000000
-            if eta >= 86400:
+            if eta >= 99 * 86400:
+                eta_str = "--:--:--:--"
+            elif eta >= 86400:
                 eta_str = "%d:" % (eta // 86400)
                 eta %= 86400
+                eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
             else:
-                eta_str = ""
-            eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
+                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
             self.updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
+            self.last_update_eta = current_time
 
     def save_callback(self, *args):
         audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
 
-    @shared.thread_wrapper
+    @shared.thread_wrapper(daemon=True)
     def separate(
         self,
         file,

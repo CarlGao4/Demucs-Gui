@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
-__version__ = "1.0"
+__version__ = "1.1a1"
 
 import shared
 
@@ -49,6 +49,7 @@ if not shared.use_PyQt6:
         QStyleFactory,
         QTableWidget,
         QTableWidgetItem,
+        QTabWidget,
         QVBoxLayout,
         QWidget,
     )
@@ -84,6 +85,7 @@ else:
         QStyleFactory,
         QTableWidget,
         QTableWidgetItem,
+        QTabWidget,
         QVBoxLayout,
         QWidget,
     )
@@ -96,7 +98,9 @@ import pathlib
 import platform
 import psutil
 import random
+import shlex
 import sys
+import threading
 import time
 import traceback
 import webbrowser
@@ -180,6 +184,13 @@ class MainWindow(QMainWindow):
     showParamSettings = Signal()
     setStatusText = Signal(str)
 
+    _execInMainThreadSignal = Signal()
+    _execInMainThreadFunc = None
+    _execInMainThreadResult = None
+    _execInMainThreadSuccess = False
+    _execInMainThreadLock = threading.Lock()
+    _execInMainThreadResultEvent = threading.Event()
+
     def __init__(self):
         super().__init__()
         self.setWindowIcon(QtGui.QIcon("./icon/icon.ico"))
@@ -187,10 +198,10 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
         self.timer = QTimer()
         self.widget = QWidget()
+        self.tab_widget = QTabWidget()
         self.setCentralWidget(self.widget)
         self.widget_layout = QVBoxLayout()
-        self.hlayout1 = QHBoxLayout()
-        self.widget_layout.addLayout(self.hlayout1)
+        self.widget_layout.addWidget(self.tab_widget)
         self.widget.setLayout(self.widget_layout)
         self.m = QMessageBox()
         self.showError.connect(self.showErrorFunc)
@@ -198,6 +209,7 @@ class MainWindow(QMainWindow):
         self.showWarning.connect(self.showWarningFunc)
         self.showParamSettings.connect(self.showParamSettingsFunc)
         self.setStatusText.connect(self.setStatusTextFunc)
+        self._execInMainThreadSignal.connect(self._exec_in_main_thread_executor)
         self.timer.singleShot(50, self.showModelSelector)
 
         self.menubar = QMenuBar()
@@ -214,21 +226,29 @@ class MainWindow(QMainWindow):
         self.menubar.addAction(self.menu_about.menuAction())
         self.setMenuBar(self.menubar)
 
+        shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x)))
+
     def showModelSelector(self):
         self.model_selector = ModelSelector()
-        self.hlayout1.addWidget(self.model_selector, 16)
+        self.tab_widget.addTab(self.model_selector, self.model_selector.widget_title)
 
     def showParamSettingsFunc(self):
-        self.vlayout1 = QVBoxLayout()
         self.param_settings = SepParamSettings()
         self.save_options = SaveOptions()
+        self.options_tab = QWidget()
+        self.options_tab.setLayout(QVBoxLayout())
+        self.options_tab.layout().addWidget(self.param_settings)
+        self.options_tab.layout().addWidget(self.save_options)
         self.file_queue = FileQueue()
         self.separation_control = SeparationControl()
-        self.vlayout1.addWidget(self.param_settings)
-        self.vlayout1.addWidget(self.save_options)
-        self.hlayout1.addLayout(self.vlayout1, 48)
-        self.hlayout1.addWidget(self.file_queue, 64)
+        self.tab_widget.addTab(self.options_tab, "Options")
+        self.tab_widget.addTab(self.file_queue, self.file_queue.widget_title % self.file_queue.queue_length)
         self.widget_layout.addWidget(self.separation_control)
+
+    def updateQueueLength(self):
+        self.tab_widget.setTabText(
+            self.tab_widget.indexOf(self.file_queue), self.file_queue.widget_title % self.file_queue.queue_length
+        )
 
     def loadModel(self, model, repo):
         try:
@@ -276,10 +296,10 @@ class MainWindow(QMainWindow):
         if sys.platform == "win32":
             os.startfile(str(shared.logfile))
         elif sys.platform == "darwin":
-            os.system("open " + str(shared.logfile))
+            os.system(shlex.join(["open", str(shared.logfile), "&"]))
         else:
             try:
-                os.system("xdg-open " + str(shared.logfile))
+                os.system(shlex.join(["xdg-open", str(shared.logfile), "&"]))
             except:
                 if (
                     self.m.question(
@@ -293,11 +313,56 @@ class MainWindow(QMainWindow):
                 ):
                     QApplication.clipboard().setText(str(shared.logfile))
 
+    def exec_in_main(self, func):
+        with self._execInMainThreadLock:
+            self._execInMainThreadFunc = func
+            self._execInMainThreadResultEvent.clear()
+            self._execInMainThreadSignal.emit()
+            self._execInMainThreadResultEvent.wait()
+            if self._execInMainThreadSuccess:
+                ret = self._execInMainThreadResult
+                self._execInMainThreadResult = None
+                self._execInMainThreadFunc = None
+                return ret
+            else:
+                err = self._execInMainThreadResult
+                self._execInMainThreadResult = None
+                self._execInMainThreadFunc = None
+                raise err
 
-class ModelSelector(QGroupBox):
+    def _exec_in_main_thread_executor(self):
+        try:
+            self._execInMainThreadResult = self._execInMainThreadFunc()
+            self._execInMainThreadSuccess = True
+        except Exception as e:
+            self._execInMainThreadResult = e
+            self._execInMainThreadSuccess = False
+        self._execInMainThreadResultEvent.set()
+
+    def validateUpdate(self, new_version):
+        if new_version is None:
+            return
+        if new_version <= __version__:
+            return
+        if (
+            self.m.question(
+                self,
+                "Update available",
+                "A new version (%s) of Demucs GUI is available. Do you want to visit GitHub to download it?"
+                % new_version,
+                self.m.StandardButton.Yes,
+                self.m.StandardButton.No,
+            )
+            == self.m.StandardButton.Yes
+        ):
+            webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/releases")
+
+
+class ModelSelector(QWidget):
+    widget_title = "Select model"
+
     def __init__(self):
         super().__init__()
-        self.setTitle("Select model")
 
         self.advanced_settings = AdvancedModelSettings(self.refreshModels)
 
@@ -306,14 +371,14 @@ class ModelSelector(QGroupBox):
         self.select_label.setFixedWidth(80)
 
         self.select_combobox = QComboBox()
-        self.select_combobox.setFixedWidth(240)
+        self.select_combobox.setMinimumWidth(240)
         self.select_combobox.currentIndexChanged.connect(self.updateModelInfo)
 
         self.model_info = ModifiedQLabel()
         self.model_info.setMinimumHeight(160)
         self.model_info.setWordWrap(True)
         self.model_info.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.model_info.setFixedWidth(400)
+        self.model_info.setMinimumWidth(300)
 
         self.refresh_button = QPushButton()
         self.refresh_button.setText("Refresh")
@@ -352,15 +417,15 @@ class ModelSelector(QGroupBox):
         self.select_combobox.addItems(self.models)
         self.setEnabled(True)
 
-    @shared.thread_wrapper
+    @shared.thread_wrapper(daemon=True)
     def loadModel(self):
         global main_window
 
-        self.setEnabled(False)
-        self.advanced_settings.setEnabled(False)
+        main_window.exec_in_main(lambda: self.setEnabled(False))
+        main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(False))
 
-        model_name = self.models[self.select_combobox.currentIndex()]
-        model_repo = self.repos[self.select_combobox.currentIndex()]
+        model_name = self.models[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
+        model_repo = self.repos[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
         logging.info(
             "Loading model %s from repo %s" % (model_name, model_repo if model_repo is not None else '"remote"')
         )
@@ -374,13 +439,13 @@ class ModelSelector(QGroupBox):
             main_window.showError.emit(
                 "Load model failed", "Failed to load model. Check log file for more information."
             )
-            self.setEnabled(True)
-            self.advanced_settings.setEnabled(True)
+            main_window.exec_in_main(lambda: self.setEnabled(True))
+            main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(True))
             return
 
         model_info = main_window.separator.modelInfo()
-        main_window.model_selector.model_info.setText(model_info)
-        self.model_info.setMinimumHeight(self.model_info.heightForWidth(400))
+        main_window.exec_in_main(lambda: main_window.model_selector.model_info.setText(model_info))
+        main_window.exec_in_main(lambda: self.model_info.setMinimumHeight(self.model_info.heightForWidth(400)))
         main_window.setStatusText.emit("Model loaded within %.4fs" % (end_time - start_time))
         main_window.showParamSettings.emit()
         logging.info("Model loaded within %.4fs" % (end_time - start_time))
@@ -466,7 +531,7 @@ class SepParamSettings(QGroupBox):
         global main_window
 
         super().__init__()
-        self.setTitle("Separating parameters")
+        self.setTitle("Separation parameters")
 
         self.device_label = QLabel()
         self.device_label.setText("Device:")
@@ -643,7 +708,7 @@ class SaveOptions(QGroupBox):
         if p:
             self.loc_input.setText(p)
 
-    @shared.thread_wrapper
+    @shared.thread_wrapper(daemon=True)
     def save(self, file, tensor, save_func, item, finishCallback):
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
@@ -671,12 +736,13 @@ class SaveOptions(QGroupBox):
         finishCallback(shared.FileStatus.Finished, item)
 
 
-class FileQueue(QGroupBox):
+class FileQueue(QWidget):
+    widget_title = "File queue (%d)"
+
     def __init__(self):
         global main_window
 
         super().__init__()
-        self.setTitle("Queue")
 
         self.table = QTableWidget()
         self.table.setColumnCount(2)
@@ -756,6 +822,8 @@ class FileQueue(QGroupBox):
         self.repaint_timer.timeout.connect(self.paint_table_progress)
         self.toggleAnimation(True)
 
+        self.queue_length = 0
+
     def table_dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
@@ -807,6 +875,8 @@ class FileQueue(QGroupBox):
                 self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
                 self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
                 self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
+                self.queue_length += 1
+                main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
         if index == 0:
@@ -842,9 +912,13 @@ class FileQueue(QGroupBox):
                 shared.FileStatus.Paused,
                 shared.FileStatus.Queued,
                 shared.FileStatus.Finished,
+                shared.FileStatus.Cancelled,
+                shared.FileStatus.Failed,
             ]:
                 continue
             self.table.removeRow(i)
+            self.queue_length -= 1
+            main_window.updateQueueLength()
 
     def pause(self):
         indexes = list(set(i.row() for i in self.table.selectedIndexes()))
@@ -886,7 +960,7 @@ class FileQueue(QGroupBox):
         return None
 
 
-class SeparationControl(QGroupBox):
+class SeparationControl(QWidget):
     startSeparateSignal = Signal()
     currentFinishedSignal = Signal(int, QTableWidgetItem)
     setModelProgressSignal = Signal(float)
@@ -915,10 +989,12 @@ class SeparationControl(QGroupBox):
         self.current_model_progressbar = QProgressBar()
         self.current_model_progressbar.setMaximum(65536)
         self.current_model_progressbar.setValue(0)
+        self.current_model_progressbar.setMinimumWidth(400)
 
         self.current_audio_progressbar = QProgressBar()
         self.current_audio_progressbar.setMaximum(65536)
         self.current_audio_progressbar.setValue(0)
+        self.current_audio_progressbar.setMinimumWidth(400)
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.start_button, 0, 0)
@@ -984,6 +1060,9 @@ class SeparationControl(QGroupBox):
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
         if self.stop_now:
             self.stop_now = False
+        if status not in [shared.FileStatus.Writing]:
+            main_window.file_queue.queue_length -= 1
+            main_window.updateQueueLength()
         if status != shared.FileStatus.Finished:
             self.start_button.setEnabled(True)
             self.startSeparateSignal.emit()

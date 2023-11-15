@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import __main__
+import functools
 import json
 import logging
 import os
@@ -23,10 +24,11 @@ import subprocess
 import sys
 import threading
 import traceback
+import urllib.request
 
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
-debug = False
+debug = True
 use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
 if not (homeDir.parent / ".git").exists():
@@ -42,6 +44,8 @@ location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/a
 
 Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows or "/xxx" on macOS and \
 Linux) in case something unexpected would happen."""
+
+update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases/latest"
 
 
 def HSize(size):
@@ -121,26 +125,50 @@ def Popen(*args, **kwargs):
     return subprocess.Popen(*args, **kwargs)
 
 
-def thread_wrapper(func):
-    if not hasattr(thread_wrapper, "index"):
-        thread_wrapper.index = 0
+def thread_wrapper(*args_thread, **kw_thread):
+    if "target" in kw_thread:
+        kw_thread.pop("target")
+    if "args" in kw_thread:
+        kw_thread.pop("args")
+    if "kwargs" in kw_thread:
+        kw_thread.pop("kwargs")
 
-    def wrapper(*args, **kwargs):
-        thread_wrapper.index += 1
+    def thread_func_wrapper(func):
+        if not hasattr(thread_wrapper, "index"):
+            thread_wrapper.index = 0
 
-        def run_and_log(idx=thread_wrapper.index):
-            logging.info(
-                "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
-            )
-            try:
-                func(*args, **kwargs)
-            finally:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            thread_wrapper.index += 1
+
+            def run_and_log(idx=thread_wrapper.index):
                 logging.info(
-                    "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                    "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
                 )
+                try:
+                    func(*args, **kwargs)
+                finally:
+                    logging.info(
+                        "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                    )
 
-        t = threading.Thread(target=run_and_log, daemon=True)
-        t.start()
-        return t
+            t = threading.Thread(target=run_and_log, *args_thread, **kw_thread)
+            t.start()
+            return t
 
-    return wrapper
+        return wrapper
+
+    return thread_func_wrapper
+
+
+@thread_wrapper(daemon=True)
+def checkUpdate(callback):
+    try:
+        logging.info("Checking for updates...")
+        with urllib.request.urlopen(update_url) as f:
+            data = json.loads(f.read())
+        logging.info("Latest version: %s" % data["tag_name"])
+        callback(data["tag_name"])
+    except:
+        logging.warning("Failed to check for updates:\n%s" % traceback.format_exc())
+        callback(None)
