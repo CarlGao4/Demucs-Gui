@@ -1110,7 +1110,7 @@ if __name__ == "__main__":
         if shared.debug:
             log = sys.stderr
         else:
-            log = open(str(shared.logfile / log_filename), mode="at")
+            log = open(str(shared.logfile / log_filename), mode="at", encoding="utf-8")
             sys.stderr = log
         handler = logging.StreamHandler(log)
         try:

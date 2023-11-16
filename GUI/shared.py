@@ -122,6 +122,7 @@ def Popen(*args, **kwargs):
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     kwargs["stdout"] = subprocess.PIPE
     kwargs["stderr"] = subprocess.PIPE
+    kwargs["stdin"] = subprocess.PIPE
     return subprocess.Popen(*args, **kwargs)
 
 
