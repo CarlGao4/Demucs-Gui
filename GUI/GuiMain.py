@@ -25,6 +25,7 @@ if not shared.use_PyQt6:
         QAbstractItemView,
         QApplication,
         QButtonGroup,
+        QCheckBox,
         QComboBox,
         QDialog,
         QDoubleSpinBox,
@@ -61,6 +62,7 @@ else:
         QAbstractItemView,
         QApplication,
         QButtonGroup,
+        QCheckBox,
         QComboBox,
         QDialog,
         QDoubleSpinBox,
@@ -107,6 +109,8 @@ import webbrowser
 
 import separator
 from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
+
+file_queue_lock = threading.Lock()
 
 
 class StartingWindow(QMainWindow):
@@ -605,6 +609,10 @@ class SepParamSettings(QGroupBox):
         self.default_button.setText("Restore defaults")
         self.default_button.clicked.connect(self.restoreDefaults)
 
+        self.separate_once_added = QCheckBox()
+        self.separate_once_added.setText("Separate once added")
+        self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
+
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.device_label, 0, 0)
         self.widget_layout.addWidget(self.device_selector, 0, 1, 1, 2)
@@ -617,7 +625,8 @@ class SepParamSettings(QGroupBox):
         self.widget_layout.addWidget(self.shifts_label, 3, 0)
         self.widget_layout.addWidget(self.shifts_spinbox, 3, 1)
         self.widget_layout.addWidget(self.shifts_slider, 3, 2)
-        self.widget_layout.addWidget(self.default_button, 4, 0, 1, 3)
+        self.widget_layout.addWidget(self.separate_once_added, 4, 0, 1, 3)
+        self.widget_layout.addWidget(self.default_button, 5, 0, 1, 3)
 
         self.setLayout(self.widget_layout)
 
@@ -861,21 +870,24 @@ class FileQueue(QWidget):
                     dirpath_path = pathlib.Path(dirpath)
                     self.addFiles([str(dirpath_path / filename) for filename in filenames])
             else:
-                row = self.table.rowCount()
-                self.table.insertRow(row)
-                if self.show_full_path:
-                    self.table.setItem(row, 0, QTableWidgetItem(str(file)))
-                else:
-                    self.table.setItem(row, 0, QTableWidgetItem(file.name))
-                delegate = ProgressDelegate()
-                self.table.setItemDelegateForColumn(1, delegate)
-                self.table.setItem(row, 1, QTableWidgetItem())
-                self.table.item(row, 0).setToolTip(str(file))
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
-                self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
-                self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
-                self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
-                self.queue_length += 1
+                with file_queue_lock:
+                    row = self.table.rowCount()
+                    self.table.insertRow(row)
+                    if self.show_full_path:
+                        self.table.setItem(row, 0, QTableWidgetItem(str(file)))
+                    else:
+                        self.table.setItem(row, 0, QTableWidgetItem(file.name))
+                    delegate = ProgressDelegate()
+                    self.table.setItemDelegateForColumn(1, delegate)
+                    self.table.setItem(row, 1, QTableWidgetItem())
+                    self.table.item(row, 0).setToolTip(str(file))
+                    self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
+                    self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                    self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
+                    self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
+                    self.queue_length += 1
+                    if self.files_added == 1 and main_window.param_settings.separate_once_added.isChecked():
+                        main_window.separation_control.start_button.click()
                 main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
@@ -951,13 +963,14 @@ class FileQueue(QWidget):
             self.table.removeRow(index + 1)
 
     def getFirstQueued(self):
-        self.setEnabled(False)
-        for i in range(self.table.rowCount()):
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
-                self.setEnabled(True)
-                return i
-        self.setEnabled(True)
-        return None
+        with file_queue_lock:
+            self.setEnabled(False)
+            for i in range(self.table.rowCount()):
+                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
+                    self.setEnabled(True)
+                    return i
+            self.setEnabled(True)
+            return None
 
 
 class SeparationControl(QWidget):
@@ -1069,10 +1082,11 @@ class SeparationControl(QWidget):
 
     def startSeparation(self):
         global main_window
+        if not self.start_button.isEnabled():
+            return
         if "{stem}" not in main_window.save_options.loc_input.text():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         self.start_button.setEnabled(False)
-        index = main_window.file_queue.getFirstQueued()
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
             main_window.setStatusText.emit("No more file to separate")
