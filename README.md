@@ -13,7 +13,7 @@ The project aims to let users without any coding experience separate tracks with
 If the application cannot be launched due to the Mac's security protection feature, try the following:
 
 1. Right-click on the Demucs-GUI app icon and select "Open".
-1. Click "Open" again in the window that appears as follows.
+2. Click "Open" again in the window that appears as follows.
 ![Open Anyway](./mac_open_anyway.png)
 
 </details>
@@ -79,7 +79,7 @@ conda install --yes --file requirements.txt
 pip install -r requirements_cuda.txt
 # Conda is not available as this project has dependencies only on PyPI
 ```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem.
+1. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the `device` column, or is labeled "not recommended", this means your GPU is not available or the VRAM is not enough. Please use CPU instead or open an issue to tell us if you think this is a problem.
 
 ## Acknowledgements
 This project includes code of [Demucs](https://github.com/facebookresearch/demucs) under MIT license.

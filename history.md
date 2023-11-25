@@ -1,5 +1,14 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.1
+Release date: Nov. 25, 2023
+
+#### Fixes
+1. Fix an issue that output is always rescaled to 99.9% when clip mode is set to "rescale"
+2. Fix an issue that window will stop to function when opening log file on non-Windows
+3. Fix an issue related with detecting FFMpeg on Windows
+4. Optimize ETA algorithm
+
 ### 1.0
 Release date: Nov. 11, 2023
 
