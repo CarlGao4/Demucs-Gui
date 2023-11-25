@@ -20,6 +20,12 @@ Release date: Nov. 11, 2023
 3. Fix sometimes progress goes back
 4. Force separation queue using Fusion style on macOS to show progress bar
 
+### Known issues
+1. May causes waiting for long time when loading a remote model for the first time
+2. **[ADDED]** **[FIXED]** Could not use remote models due to a mistake packing the application on Windows
+3. **[ADDED]** Can't start FFmpeg sometimes. If you see `FFMpeg is not available`, please restart the application.
+4. **[ADDED]** Will always rescale to 99.9% when clip mode is set to "rescale"
+
 ### *1.0a1*
 Release date: Oct. 6, 2023
 
