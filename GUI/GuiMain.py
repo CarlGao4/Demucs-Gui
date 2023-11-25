@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
 
-__version__ = "1.0"
+__version__ = "1.0.1"
 
 import shared
 
@@ -96,13 +96,17 @@ import pathlib
 import platform
 import psutil
 import random
+import shlex
 import sys
+import threading
 import time
 import traceback
 import webbrowser
 
 import separator
 from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
+
+file_queue_lock = threading.Lock()
 
 
 class StartingWindow(QMainWindow):
@@ -276,10 +280,10 @@ class MainWindow(QMainWindow):
         if sys.platform == "win32":
             os.startfile(str(shared.logfile))
         elif sys.platform == "darwin":
-            os.system("open " + str(shared.logfile))
+            os.system(shlex.join(["open", str(shared.logfile), "&"]))
         else:
             try:
-                os.system("xdg-open " + str(shared.logfile))
+                os.system(shlex.join(["xdg-open", str(shared.logfile), "&"]))
             except:
                 if (
                     self.m.question(
@@ -352,7 +356,7 @@ class ModelSelector(QGroupBox):
         self.select_combobox.addItems(self.models)
         self.setEnabled(True)
 
-    @shared.thread_wrapper
+    @shared.thread_wrapper(daemon=True)
     def loadModel(self):
         global main_window
 
@@ -466,7 +470,7 @@ class SepParamSettings(QGroupBox):
         global main_window
 
         super().__init__()
-        self.setTitle("Separating parameters")
+        self.setTitle("Separation parameters")
 
         self.device_label = QLabel()
         self.device_label.setText("Device:")
@@ -643,7 +647,7 @@ class SaveOptions(QGroupBox):
         if p:
             self.loc_input.setText(p)
 
-    @shared.thread_wrapper
+    @shared.thread_wrapper(daemon=True)
     def save(self, file, tensor, save_func, item, finishCallback):
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
@@ -660,7 +664,10 @@ class SaveOptions(QGroupBox):
             else:
                 file_path = pathlib.Path(file_path_str)
             if self.clip_mode.currentText() == "rescale":
-                data = stem_data / stem_data.abs().max() * 0.999
+                if (peak := stem_data.abs().max()) > 0.999:
+                    data = stem_data / peak * 0.999
+                else:
+                    data = stem_data
             elif self.clip_mode.currentText() == "clamp":
                 data = stem_data.clamp(-0.999, 0.999)
             else:
@@ -793,20 +800,21 @@ class FileQueue(QGroupBox):
                     dirpath_path = pathlib.Path(dirpath)
                     self.addFiles([str(dirpath_path / filename) for filename in filenames])
             else:
-                row = self.table.rowCount()
-                self.table.insertRow(row)
-                if self.show_full_path:
-                    self.table.setItem(row, 0, QTableWidgetItem(str(file)))
-                else:
-                    self.table.setItem(row, 0, QTableWidgetItem(file.name))
-                delegate = ProgressDelegate()
-                self.table.setItemDelegateForColumn(1, delegate)
-                self.table.setItem(row, 1, QTableWidgetItem())
-                self.table.item(row, 0).setToolTip(str(file))
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
-                self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
-                self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
-                self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
+                with file_queue_lock:
+                    row = self.table.rowCount()
+                    self.table.insertRow(row)
+                    if self.show_full_path:
+                        self.table.setItem(row, 0, QTableWidgetItem(str(file)))
+                    else:
+                        self.table.setItem(row, 0, QTableWidgetItem(file.name))
+                    delegate = ProgressDelegate()
+                    self.table.setItemDelegateForColumn(1, delegate)
+                    self.table.setItem(row, 1, QTableWidgetItem())
+                    self.table.item(row, 0).setToolTip(str(file))
+                    self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
+                    self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                    self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
+                    self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
 
     def tableHeaderClicked(self, index):
         if index == 0:
@@ -842,6 +850,8 @@ class FileQueue(QGroupBox):
                 shared.FileStatus.Paused,
                 shared.FileStatus.Queued,
                 shared.FileStatus.Finished,
+                shared.FileStatus.Cancelled,
+                shared.FileStatus.Failed,
             ]:
                 continue
             self.table.removeRow(i)
@@ -877,13 +887,14 @@ class FileQueue(QGroupBox):
             self.table.removeRow(index + 1)
 
     def getFirstQueued(self):
-        self.setEnabled(False)
-        for i in range(self.table.rowCount()):
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
-                self.setEnabled(True)
-                return i
-        self.setEnabled(True)
-        return None
+        with file_queue_lock:
+            self.setEnabled(False)
+            for i in range(self.table.rowCount()):
+                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
+                    self.setEnabled(True)
+                    return i
+            self.setEnabled(True)
+            return None
 
 
 class SeparationControl(QGroupBox):
@@ -993,7 +1004,6 @@ class SeparationControl(QGroupBox):
         if "{stem}" not in main_window.save_options.loc_input.text():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         self.start_button.setEnabled(False)
-        index = main_window.file_queue.getFirstQueued()
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
             main_window.setStatusText.emit("No more file to separate")
@@ -1031,7 +1041,7 @@ if __name__ == "__main__":
         if shared.debug:
             log = sys.stderr
         else:
-            log = open(str(shared.logfile / log_filename), mode="at")
+            log = open(str(shared.logfile / log_filename), mode="at", encoding="utf-8")
             sys.stderr = log
         handler = logging.StreamHandler(log)
         try:

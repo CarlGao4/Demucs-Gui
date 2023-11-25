@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import __main__
+import functools
 import json
 import logging
 import os
@@ -23,6 +24,7 @@ import subprocess
 import sys
 import threading
 import traceback
+import urllib.request
 
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
@@ -42,6 +44,8 @@ location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/a
 
 Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows or "/xxx" on macOS and \
 Linux) in case something unexpected would happen."""
+
+update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases/latest"
 
 
 def HSize(size):
@@ -74,10 +78,14 @@ def InitializeFolder():
     if settingsFile.exists():
         try:
             with open(str(settingsFile), mode="rt", encoding="utf8") as f:
-                settings = json.loads(f.read())
+                settings_data = f.read()
+                settings = json.loads(settings_data)
             if type(settings) != dict:
                 raise TypeError
         except:
+            print("Settings file is corrupted, reset to default", file=sys.stderr)
+            print("Error message:\n%s" % traceback.format_exc(), file=sys.stderr)
+            print("Settings file content:\n%s" % settings_data, file=sys.stderr)
             settings = {}
     else:
         settings = {}
@@ -86,9 +94,15 @@ def InitializeFolder():
 def SetSetting(attr, value):
     global settings, settingsFile
     logging.debug('(%s) Set setting "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
+    if attr in settings and settings[attr] == value:
+        logging.debug("Setting not changed, ignored")
+        return
     settings[attr] = value
-    with open(str(settingsFile), mode="wt", encoding="utf8") as f:
-        f.write(json.dumps(settings, separators=(",", ":")))
+    try:
+        with open(str(settingsFile), mode="wt", encoding="utf8") as f:
+            f.write(json.dumps(settings, separators=(",", ":")))
+    except:
+        logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
 
 
 def GetSetting(attr, default=None, autoset=True):
@@ -118,29 +132,54 @@ def Popen(*args, **kwargs):
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     kwargs["stdout"] = subprocess.PIPE
     kwargs["stderr"] = subprocess.PIPE
+    kwargs["stdin"] = subprocess.PIPE
     return subprocess.Popen(*args, **kwargs)
 
 
-def thread_wrapper(func):
-    if not hasattr(thread_wrapper, "index"):
-        thread_wrapper.index = 0
+def thread_wrapper(*args_thread, **kw_thread):
+    if "target" in kw_thread:
+        kw_thread.pop("target")
+    if "args" in kw_thread:
+        kw_thread.pop("args")
+    if "kwargs" in kw_thread:
+        kw_thread.pop("kwargs")
 
-    def wrapper(*args, **kwargs):
-        thread_wrapper.index += 1
+    def thread_func_wrapper(func):
+        if not hasattr(thread_wrapper, "index"):
+            thread_wrapper.index = 0
 
-        def run_and_log(idx=thread_wrapper.index):
-            logging.info(
-                "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
-            )
-            try:
-                func(*args, **kwargs)
-            finally:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            thread_wrapper.index += 1
+
+            def run_and_log(idx=thread_wrapper.index):
                 logging.info(
-                    "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                    "[%d] Thread %s (%s) starts" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
                 )
+                try:
+                    func(*args, **kwargs)
+                finally:
+                    logging.info(
+                        "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)
+                    )
 
-        t = threading.Thread(target=run_and_log, daemon=True)
-        t.start()
-        return t
+            t = threading.Thread(target=run_and_log, *args_thread, **kw_thread)
+            t.start()
+            return t
 
-    return wrapper
+        return wrapper
+
+    return thread_func_wrapper
+
+
+@thread_wrapper(daemon=True)
+def checkUpdate(callback):
+    try:
+        logging.info("Checking for updates...")
+        with urllib.request.urlopen(update_url) as f:
+            data = json.loads(f.read())
+        logging.info("Latest version: %s" % data["tag_name"])
+        callback(data["tag_name"])
+    except:
+        logging.warning("Failed to check for updates:\n%s" % traceback.format_exc())
+        callback(None)
