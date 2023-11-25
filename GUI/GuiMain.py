@@ -30,6 +30,7 @@ if not shared.use_PyQt6:
         QDialog,
         QDoubleSpinBox,
         QFileDialog,
+        QFrame,
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
@@ -67,6 +68,7 @@ else:
         QDialog,
         QDoubleSpinBox,
         QFileDialog,
+        QFrame,
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
@@ -694,13 +696,18 @@ class SaveOptions(QGroupBox):
         self.sample_fmt.addItem("float32", "FLOAT")
         self.sample_fmt.setCurrentIndex(0)
 
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+
         self.widget_layout = QGridLayout()
-        self.widget_layout.addWidget(self.location_label, 0, 0, 1, 2)
+        self.widget_layout.addWidget(self.location_label, 0, 0, 1, 1)
         self.widget_layout.addWidget(self.location_help, 0, 2)
-        self.widget_layout.addWidget(self.loc_relative_path_button, 1, 1)
-        self.widget_layout.addWidget(self.loc_absolute_path_button, 1, 2)
-        self.widget_layout.addWidget(self.loc_input, 2, 1, 1, 2)
-        self.widget_layout.addWidget(self.browse_button, 3, 1, 1, 2)
+        self.widget_layout.addWidget(self.loc_relative_path_button, 1, 0)
+        self.widget_layout.addWidget(self.loc_absolute_path_button, 1, 1)
+        self.widget_layout.addWidget(self.browse_button, 1, 2)
+        self.widget_layout.addWidget(self.loc_input, 2, 0, 1, 3)
+        self.widget_layout.addWidget(line, 3, 0, 1, 3)
         self.widget_layout.addWidget(self.clip_mode_label, 4, 0, 1, 2)
         self.widget_layout.addWidget(self.clip_mode, 4, 2)
         self.widget_layout.addWidget(self.file_format_label, 5, 0, 1, 2)
@@ -734,7 +741,8 @@ class SaveOptions(QGroupBox):
             else:
                 file_path = pathlib.Path(file_path_str)
             if self.clip_mode.currentText() == "rescale":
-                data = stem_data / stem_data.abs().max() * 0.999
+                if (peak := stem_data.abs().max()) > 0.999:
+                    data = stem_data / peak * 0.999
             elif self.clip_mode.currentText() == "clamp":
                 data = stem_data.clamp(-0.999, 0.999)
             else:
@@ -886,8 +894,8 @@ class FileQueue(QWidget):
                     self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
                     self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
                     self.queue_length += 1
-                    if self.files_added == 1 and main_window.param_settings.separate_once_added.isChecked():
-                        main_window.separation_control.start_button.click()
+                if main_window.param_settings.separate_once_added.isChecked():
+                    main_window.separation_control.start_button.click()
                 main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
@@ -929,8 +937,12 @@ class FileQueue(QWidget):
             ]:
                 continue
             self.table.removeRow(i)
-            self.queue_length -= 1
-            main_window.updateQueueLength()
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+                shared.FileStatus.Queued,
+                shared.FileStatus.Paused,
+            ]:
+                self.queue_length -= 1
+                main_window.updateQueueLength()
 
     def pause(self):
         indexes = list(set(i.row() for i in self.table.selectedIndexes()))

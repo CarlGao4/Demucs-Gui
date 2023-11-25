@@ -78,10 +78,14 @@ def InitializeFolder():
     if settingsFile.exists():
         try:
             with open(str(settingsFile), mode="rt", encoding="utf8") as f:
-                settings = json.loads(f.read())
+                settings_data = f.read()
+                settings = json.loads(settings_data)
             if type(settings) != dict:
                 raise TypeError
         except:
+            print("Settings file is corrupted, reset to default", file=sys.stderr)
+            print("Error message:\n%s" % traceback.format_exc(), file=sys.stderr)
+            print("Settings file content:\n%s" % settings_data, file=sys.stderr)
             settings = {}
     else:
         settings = {}
@@ -90,9 +94,15 @@ def InitializeFolder():
 def SetSetting(attr, value):
     global settings, settingsFile
     logging.debug('(%s) Set setting "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
+    if attr in settings and settings[attr] == value:
+        logging.debug("Setting not changed, ignored")
+        return
     settings[attr] = value
-    with open(str(settingsFile), mode="wt", encoding="utf8") as f:
-        f.write(json.dumps(settings, separators=(",", ":")))
+    try:
+        with open(str(settingsFile), mode="wt", encoding="utf8") as f:
+            f.write(json.dumps(settings, separators=(",", ":")))
+    except:
+        logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
 
 
 def GetSetting(attr, default=None, autoset=True):
