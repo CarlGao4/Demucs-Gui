@@ -1,7 +1,10 @@
 Note: Versions in *italic* means that the release is a beta version.
 
-### 1.1
+### 1.0.1
 Release date: Nov. 25, 2023
+
+#### Updates
+1. Automatically check updates
 
 #### Fixes
 1. Fix an issue that output is always rescaled to 99.9% when clip mode is set to "rescale"
