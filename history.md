@@ -1,5 +1,12 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.0.2
+Release date: None
+
+#### Fixes
+1. Fix an issue about reading audio
+2. Show submodels in bag of models before loading it
+
 ### 1.0.1
 Release date: Nov. 25, 2023
 
@@ -11,6 +18,9 @@ Release date: Nov. 25, 2023
 2. Fix an issue that window will stop to function when opening log file on non-Windows
 3. Fix an issue related with detecting FFMpeg on Windows
 4. Optimize ETA algorithm
+
+### Known issues
+1. May causes waiting for long time when loading a remote model for the first time
 
 ### 1.0
 Release date: Nov. 11, 2023
