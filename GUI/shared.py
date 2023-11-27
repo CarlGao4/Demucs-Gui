@@ -130,6 +130,7 @@ def Popen(*args, **kwargs):
     """A wrapper of `subprocess.Popen` to hide console window on Windows and redirect stdout and stderr to PIPE"""
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    # stdin, stdout and stderr are always redirected or creating process will fail on Windows without console
     kwargs["stdout"] = subprocess.PIPE
     kwargs["stderr"] = subprocess.PIPE
     kwargs["stdin"] = subprocess.PIPE

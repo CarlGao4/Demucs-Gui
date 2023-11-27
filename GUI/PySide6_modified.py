@@ -48,6 +48,7 @@ from typing import Union
 import sys
 
 
+# Modified so that text can be wrapped everywhere
 class ModifiedQLabel(QLabel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -89,6 +90,7 @@ class ProgressDelegate(QStyledItemDelegate):
             QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
 
 
+# A simpler QAction that can be created with a callback
 class Action(QAction):
     def __init__(self, text, parent=None, callback=None):
         super().__init__(text, parent)
