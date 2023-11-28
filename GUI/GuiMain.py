@@ -1,4 +1,6 @@
-LICENSE = """Demucs-GUI 1.0
+__version__ = "1.0.2"
+
+LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
 
 This program is free software: you can redistribute it and/or modify \
@@ -13,8 +15,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
-
-__version__ = "1.0.2"
 
 import shared
 
@@ -278,12 +278,12 @@ class MainWindow(QMainWindow):
 
     def open_log(self):
         if sys.platform == "win32":
-            os.startfile(str(shared.logfile))
+            os.startfile(str(shared.logfile.resolve()))
         elif sys.platform == "darwin":
-            os.system(shlex.join(["open", str(shared.logfile), "&"]))
+            os.system(shlex.join(["open", str(shared.logfile.resolve()), "&"]))
         else:
             try:
-                os.system(shlex.join(["xdg-open", str(shared.logfile), "&"]))
+                os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
             except:
                 if (
                     self.m.question(

@@ -1,11 +1,13 @@
 Note: Versions in *italic* means that the release is a beta version.
 
 ### 1.0.2
-Release date: None
+Release date: Nov. 28, 2023
+
+#### Updates
+1. Show submodels in bag of models before loading it
 
 #### Fixes
 1. Fix an issue about reading audio
-2. Show submodels in bag of models before loading it
 
 ### 1.0.1
 Release date: Nov. 25, 2023
