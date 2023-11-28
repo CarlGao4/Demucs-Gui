@@ -22,6 +22,7 @@ import sys
 import time
 import traceback
 import typing as tp
+import yaml
 
 from fractions import Fraction
 
@@ -119,6 +120,19 @@ def autoListModels():
                 info += "\nPosition: Local model"
                 info += "\nRepo: " + str(repopath)
             info += "\nFile: " + str(filepath)
+            try:
+                with open(filepath, "rt", encoding="utf8") as f:
+                    model_def = yaml.safe_load(f)
+                if weights := model_def.get("weights"):
+                    info += "\nModels and weights:"
+                    for i, (model, weight) in enumerate(zip(model_def["models"], weights)):
+                        info += "\n\u3000%d. %s: %s" % (i + 1, model, weight)
+                else:
+                    info += "\nModels: " + ", ".join(model_def["models"])
+                if segment := model_def.get("segment"):
+                    info += "\nDefault segment: %.1f" % segment
+            except:
+                logging.error("Failed to load info of model %s:\n%s" % (sig, traceback.format_exc()))
             bags.append((sig, info, repopath))
         for sig, filepath in new_models["single"].items():
             info = "Model signature: " + sig
@@ -159,6 +173,9 @@ class Separator:
             self.default_segment = self.separator.model.segment
         else:
             self.default_segment = min(i.segment for i in self.separator.model.models)  # type: ignore
+            if hasattr(self.separator.model, "segment"):
+                self.default_segment = min(self.default_segment, self.separator.model.segment)
+        self.default_segment = max(self.default_segment, 0.1)
         self.sources = self.separator.model.sources
         self.separating = False
 
@@ -172,7 +189,7 @@ class Separator:
             for i in range(len(self.separator.model.models)):
                 segment = self.separator.model.models[i].segment
                 infos.append(
-                    "Model %d:\n\tType: %s\n\tDefault segment: %.8g\n\tWeight: %s"
+                    "Model %d:\n\u3000Type: %s\n\u3000Default segment: %.8g\n\u3000Weight: %s"
                     % (
                         i,
                         self.separator.model.models[i].__class__.__name__,

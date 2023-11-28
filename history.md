@@ -1,5 +1,29 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.0.2
+Release date: Nov. 28, 2023
+
+#### Updates
+1. Show submodels in bag of models before loading it
+
+#### Fixes
+1. Fix an issue about reading audio
+
+### 1.0.1
+Release date: Nov. 25, 2023
+
+#### Updates
+1. Automatically check updates
+
+#### Fixes
+1. Fix an issue that output is always rescaled to 99.9% when clip mode is set to "rescale"
+2. Fix an issue that window will stop to function when opening log file on non-Windows
+3. Fix an issue related with detecting FFMpeg on Windows
+4. Optimize ETA algorithm
+
+### Known issues
+1. May causes waiting for long time when loading a remote model for the first time
+
 ### 1.0
 Release date: Nov. 11, 2023
 
@@ -19,6 +43,12 @@ Release date: Nov. 11, 2023
 2. Fixed init error of mps
 3. Fix sometimes progress goes back
 4. Force separation queue using Fusion style on macOS to show progress bar
+
+### Known issues
+1. May causes waiting for long time when loading a remote model for the first time
+2. **[ADDED]** **[FIXED]** Could not use remote models due to a mistake packing the application on Windows
+3. **[ADDED]** Can't start FFmpeg sometimes. If you see `FFMpeg is not available`, please restart the application.
+4. **[ADDED]** Will always rescale to 99.9% when clip mode is set to "rescale"
 
 ### *1.0a1*
 Release date: Oct. 6, 2023

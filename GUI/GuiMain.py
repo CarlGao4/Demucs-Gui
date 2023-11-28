@@ -1,4 +1,6 @@
-LICENSE = """Demucs-GUI 1.0
+__version__ = "1.1a1"
+
+LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
 
 This program is free software: you can redistribute it and/or modify \
@@ -13,8 +15,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see <https://www.gnu.org/licenses/>."""
-
-__version__ = "1.1a1"
 
 import shared
 
@@ -300,12 +300,12 @@ class MainWindow(QMainWindow):
 
     def open_log(self):
         if sys.platform == "win32":
-            os.startfile(str(shared.logfile))
+            os.startfile(str(shared.logfile.resolve()))
         elif sys.platform == "darwin":
-            os.system(shlex.join(["open", str(shared.logfile), "&"]))
+            os.system(shlex.join(["open", str(shared.logfile.resolve())]))
         else:
             try:
-                os.system(shlex.join(["xdg-open", str(shared.logfile), "&"]))
+                os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
             except:
                 if (
                     self.m.question(
@@ -743,6 +743,8 @@ class SaveOptions(QGroupBox):
             if self.clip_mode.currentText() == "rescale":
                 if (peak := stem_data.abs().max()) > 0.999:
                     data = stem_data / peak * 0.999
+                else:
+                    data = stem_data
             elif self.clip_mode.currentText() == "clamp":
                 data = stem_data.clamp(-0.999, 0.999)
             else:

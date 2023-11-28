@@ -66,12 +66,12 @@ def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = l
     logging.debug("Reading audio with soundfile: %s" % file)
     try:
         return read_audio_soundfile(file, target_sr, update_status)
-    except soundfile.LibsndfileError:
+    except:
         logging.error("Failed to read with soundfile:\n" + traceback.format_exc())
     logging.debug("Reading audio with ffmpeg: %s" % file)
     try:
         return read_audio_ffmpeg(file, target_sr, update_status)
-    except shared.subprocess.CalledProcessError:
+    except:
         logging.error("Failed to read with ffmpeg:\n" + traceback.format_exc())
 
 
@@ -105,8 +105,16 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     command += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
     p = shared.Popen(command)
     logging.debug("ffmpeg command: %s" % shlex.join(p.args))
+    ffmpeg_output = b""
     wav_buffer = io.BytesIO()
-    wav_buffer.write(p.stdout.read())
+    while True:
+        wav_buffer.write(p.stdout.read(1024))
+        ffmpeg_output += p.stderr.read(1024)
+        if p.poll() is not None:
+            break
+    if ffmpeg_output:
+        logging.warning("ffmpeg output:\n" + ffmpeg_output.decode())
+    assert p.returncode == 0, "FFmpeg failed with code %d" % p.returncode
     wav_buffer.seek(0)
     ffmpeg_log = p.stderr.read().decode()
     if ffmpeg_log:
