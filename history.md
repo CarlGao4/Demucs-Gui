@@ -1,5 +1,14 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.0.2.1
+Release date: Nov. 28, 2023
+
+#### Fixes
+1. Fix an issue about reading audio with FFMpeg
+
+#### Known issues
+1. May causes waiting for long time when loading a remote model for the first time
+
 ### 1.0.2
 Release date: Nov. 28, 2023
 
@@ -8,6 +17,10 @@ Release date: Nov. 28, 2023
 
 #### Fixes
 1. Fix an issue about reading audio
+
+#### Known issues
+1. **[NEW]** **[ADDED]** Will get stuck when reading with FFMpeg
+2. May causes waiting for long time when loading a remote model for the first time
 
 ### 1.0.1
 Release date: Nov. 25, 2023
