@@ -95,9 +95,11 @@ else:
     )
 
 import datetime
+import functools
 import logging
 import logging.handlers
 import os
+import packaging.version
 import pathlib
 import platform
 import psutil
@@ -227,8 +229,22 @@ class MainWindow(QMainWindow):
         self.menu_about_usage = Action(
             "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
         )
+        self.menu_clear_history = Action("Clear history", self, self.clear_history)
+        self.menu_check_update = Action(
+            "Check for update",
+            self,
+            lambda: shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x, show=True))),
+        )
         self.menu_about_log = Action("Open log", self, self.open_log)
-        self.menu_about.addActions([self.menu_about_about, self.menu_about_usage, self.menu_about_log])
+        self.menu_about.addActions(
+            [
+                self.menu_about_about,
+                self.menu_about_usage,
+                self.menu_clear_history,
+                self.menu_check_update,
+                self.menu_about_log,
+            ]
+        )
         self.menubar.addAction(self.menu_about.menuAction())
         self.setMenuBar(self.menubar)
 
@@ -345,10 +361,14 @@ class MainWindow(QMainWindow):
             self._execInMainThreadSuccess = False
         self._execInMainThreadResultEvent.set()
 
-    def validateUpdate(self, new_version):
+    def validateUpdate(self, new_version, show=False):
         if new_version is None:
+            if show:
+                self.m.warning(self, "Check for update failed", "Failed to check for update. Check log file for details.")
             return
-        if new_version <= __version__:
+        if packaging.version.Version(new_version) <= packaging.version.Version(__version__):
+            if show:
+                self.m.information(self, "No update available", "You are using the latest version.")
             return
         if (
             self.m.question(
@@ -362,6 +382,19 @@ class MainWindow(QMainWindow):
             == self.m.StandardButton.Yes
         ):
             webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/releases")
+
+    def clear_history(self):
+        if (
+            self.m.question(
+                self,
+                "Clear history",
+                "Are you sure you want to clear the history? This action cannot be undone.",
+                self.m.StandardButton.Yes,
+                self.m.StandardButton.No,
+            )
+            == self.m.StandardButton.Yes
+        ):
+            shared.ResetHistory()
 
 
 class ModelSelector(QWidget):
@@ -614,6 +647,8 @@ class SepParamSettings(QGroupBox):
         self.separate_once_added = QCheckBox()
         self.separate_once_added.setText("Separate once added")
         self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
+        self.separate_once_added.setChecked(shared.GetHistory("separate_once_added", False))
+        self.separate_once_added.stateChanged.connect(functools.partial(shared.SetHistory, "separate_once_added"))
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.device_label, 0, 0)
@@ -664,9 +699,17 @@ class SaveOptions(QGroupBox):
         self.loc_absolute_path_button.setText("Absolute path")
         self.location_group.addButton(self.loc_relative_path_button, 0)
         self.location_group.addButton(self.loc_absolute_path_button, 1)
-        self.loc_relative_path_button.setChecked(True)
-        self.loc_input = QLineEdit()
-        self.loc_input.setText("separated/{model}/{track}/{stem}.{ext}")
+        self.location_group.idClicked.connect(functools.partial(shared.SetHistory, "save_location_type"))
+        if shared.GetHistory("save_location_type", 0) == 0:
+            self.loc_relative_path_button.setChecked(True)
+        else:
+            self.loc_absolute_path_button.setChecked(True)
+        self.loc_input = QComboBox()
+        self.loc_input.setEditable(True)
+        self.loc_input.addItems(
+            list(shared.GetHistory("save_location", "separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True))
+        )
+        self.loc_input.setCurrentIndex(0)
         self.browse_button = QPushButton()
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.browseLocation)
@@ -678,14 +721,16 @@ class SaveOptions(QGroupBox):
 
         self.clip_mode = QComboBox()
         self.clip_mode.addItems(["rescale", "clamp", "none"])
-        self.clip_mode.setCurrentIndex(0)
+        self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", "rescale"))
+        self.clip_mode.currentTextChanged.connect(functools.partial(shared.SetHistory, "clip_mode"))
 
         self.file_format_label = QLabel()
         self.file_format_label.setText("File format:")
 
         self.file_format = QComboBox()
         self.file_format.addItems(["wav", "flac"])
-        self.file_format.setCurrentIndex(1)
+        self.file_format.setCurrentText(shared.GetHistory("file_format", "flac"))
+        self.file_format.currentTextChanged.connect(functools.partial(shared.SetHistory, "file_format"))
 
         self.sample_fmt_label = QLabel()
         self.sample_fmt_label.setText("Sample format:")
@@ -694,7 +739,8 @@ class SaveOptions(QGroupBox):
         self.sample_fmt.addItem("int16", "PCM_16")
         self.sample_fmt.addItem("int24", "PCM_24")
         self.sample_fmt.addItem("float32", "FLOAT")
-        self.sample_fmt.setCurrentIndex(0)
+        self.sample_fmt.setCurrentText(shared.GetHistory("sample_fmt", "int16"))
+        self.sample_fmt.currentTextChanged.connect(functools.partial(shared.SetHistory, "sample_fmt"))
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -722,14 +768,14 @@ class SaveOptions(QGroupBox):
     def browseLocation(self):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
-            self.loc_input.setText(p)
+            self.loc_input.setCurrentText(p)
 
     @shared.thread_wrapper(daemon=True)
     def save(self, file, tensor, save_func, item, finishCallback):
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
         for stem, stem_data in tensor.items():
-            file_path_str = self.loc_input.text().format(
+            file_path_str = self.loc_input.currentText().format(
                 track=file.stem,
                 trackext=file.name,
                 stem=stem,
@@ -819,7 +865,7 @@ class FileQueue(QWidget):
         self.pause_button.clicked.connect(self.pause)
 
         self.resume_button = QPushButton()
-        self.resume_button.setText("Resume")
+        self.resume_button.setText("Resume / Retry")
         self.resume_button.clicked.connect(self.resume)
 
         self.move_top_button = QPushButton()
@@ -959,6 +1005,7 @@ class FileQueue(QWidget):
             if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
                 shared.FileStatus.Paused,
                 shared.FileStatus.Cancelled,
+                shared.FileStatus.Failed,
             ]:
                 self.table.item(i, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
                 self.table.item(i, 1).setData(ProgressDelegate.TextRole, "Queued")
@@ -1098,7 +1145,7 @@ class SeparationControl(QWidget):
         global main_window
         if not self.start_button.isEnabled():
             return
-        if "{stem}" not in main_window.save_options.loc_input.text():
+        if "{stem}" not in main_window.save_options.loc_input.currentText():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         self.start_button.setEnabled(False)
         if (index := main_window.file_queue.getFirstQueued()) is None:

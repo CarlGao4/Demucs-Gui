@@ -18,8 +18,11 @@ import __main__
 import functools
 import json
 import logging
+import lzma
+import ordered_set
 import os
 import pathlib
+import pickle
 import subprocess
 import sys
 import threading
@@ -33,6 +36,7 @@ use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
 if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
     import ctypes
+
     ctypes.windll.kernel32.FreeConsole()
 
 if not (homeDir.parent / ".git").exists():
@@ -51,6 +55,9 @@ Linux) in case something unexpected would happen."""
 
 update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases/latest"
 
+settingsLock = threading.Lock()
+historyLock = threading.Lock()
+
 
 def HSize(size):
     s = size
@@ -65,19 +72,20 @@ def HSize(size):
 
 
 def InitializeFolder():
-    global logfile, pretrained, settingsFile, settings
+    global logfile, pretrained, settingsFile, historyFile, configPath, settings, history
     if sys.platform == "win32":
-        logfile = pathlib.Path(os.environ["APPDATA"])
+        configPath = pathlib.Path(os.environ["APPDATA"])
     elif sys.platform == "darwin" or sys.platform == "linux":
-        logfile = pathlib.Path.home() / ".config"
+        configPath = pathlib.Path.home() / ".config"
     else:
-        logfile = homeDir
-    logfile = logfile / "demucs-gui"
-    logfile.mkdir(parents=True, exist_ok=True)
-    pretrained = logfile / "pretrained"
+        configPath = homeDir
+    configPath = configPath / "demucs-gui"
+    configPath.mkdir(parents=True, exist_ok=True)
+    pretrained = configPath / "pretrained"
     pretrained.mkdir(parents=True, exist_ok=True)
-    settingsFile = logfile / "settings.json"
-    logfile = logfile / "log"
+    settingsFile = configPath / "settings.json"
+    historyFile = configPath / "history.db"
+    logfile = configPath / "log"
     logfile.mkdir(parents=True, exist_ok=True)
     if settingsFile.exists():
         try:
@@ -93,20 +101,33 @@ def InitializeFolder():
             settings = {}
     else:
         settings = {}
+    if historyFile.exists():
+        try:
+            with open(str(historyFile), mode="rb") as f:
+                history = pickle.loads(lzma.decompress(f.read()))
+            if type(history) != dict:
+                raise TypeError
+        except:
+            print("History file is corrupted, reset to default", file=sys.stderr)
+            print("Error message:\n%s" % traceback.format_exc(), file=sys.stderr)
+            history = {}
+    else:
+        history = {}
 
 
 def SetSetting(attr, value):
-    global settings, settingsFile
-    logging.debug('(%s) Set setting "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
-    if attr in settings and settings[attr] == value:
-        logging.debug("Setting not changed, ignored")
-        return
-    settings[attr] = value
-    try:
-        with open(str(settingsFile), mode="wt", encoding="utf8") as f:
-            f.write(json.dumps(settings, separators=(",", ":")))
-    except:
-        logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
+    global settings, settingsFile, settingsLock
+    with settingsLock:
+        logging.debug('(%s) Set setting "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
+        if attr in settings and settings[attr] == value:
+            logging.debug("Setting not changed, ignored")
+            return
+        settings[attr] = value
+        try:
+            with open(str(settingsFile), mode="wt", encoding="utf8") as f:
+                f.write(json.dumps(settings, separators=(",", ":")))
+        except:
+            logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
 
 
 def GetSetting(attr, default=None, autoset=True):
@@ -117,6 +138,62 @@ def GetSetting(attr, default=None, autoset=True):
         if autoset:
             SetSetting(attr, default)
         return default
+
+
+def _SaveHistory():
+    global history, historyFile, historyLock
+    with historyLock:
+        try:
+            with open(str(historyFile), mode="wb") as f:
+                f.write(lzma.compress(pickle.dumps(history), preset=7))
+        except:
+            logging.warning("Failed to save history:\n%s" % traceback.format_exc())
+
+
+def SetHistory(attr, value):
+    global history, historyFile, historyLock
+    with historyLock:
+        logging.debug('(%s) Set history "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
+        if attr in history and history[attr] == value:
+            logging.debug("History not changed, ignored")
+            return
+        history[attr] = value
+    _SaveHistory()
+
+
+def GetHistory(attr, default=None, autoset=True, use_ordered_set=False):
+    global history
+    if attr in history:
+        if (not use_ordered_set) or type(history[attr]) == ordered_set.OrderedSet:
+            return history[attr]
+        return ordered_set.OrderedSet([history[attr]])
+    else:
+        if autoset and not use_ordered_set:
+            SetHistory(attr, default)
+            return default
+        else:
+            SetHistory(attr, ordered_set.OrderedSet([default]))
+            return history[attr]
+
+
+def AddHistory(attr, value):
+    old_value = GetHistory(attr, ordered_set.OrderedSet(), False)
+    if type(old_value) != ordered_set.OrderedSet:
+        old_value = ordered_set.OrderedSet([old_value])
+    SetHistory(attr, ordered_set.OrderedSet([value]) | old_value)
+
+
+def ResetHistory(attr=None):
+    global history, historyFile, historyLock
+    if attr is None:
+        with historyLock:
+            history = {}
+        _SaveHistory()
+    else:
+        if attr in history:
+            with historyLock:
+                history.pop(attr)
+            _SaveHistory()
 
 
 class FileStatus:

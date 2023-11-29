@@ -17,11 +17,12 @@
 import shared
 
 if not shared.use_PyQt6:
-    from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
-    from PySide6.QtGui import QAction, QPainter
+    from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QSize, Qt
+    from PySide6.QtGui import QAction, QFontMetrics, QPainter
     from PySide6.QtWidgets import (
         QApplication,
         QLabel,
+        QSizePolicy,
         QStyle,
         QStyleFactory,
         QStyledItemDelegate,
@@ -31,10 +32,11 @@ if not shared.use_PyQt6:
     )
 else:
     from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, Qt  # type: ignore
-    from PyQt6.QtGui import QAction, QPainter  # type: ignore
+    from PyQt6.QtGui import QAction, QFontMetrics, QPainter  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
         QLabel,
+        QSizePolicy,
         QStyle,
         QStyleFactory,
         QStyledItemDelegate,
@@ -56,6 +58,8 @@ class ModifiedQLabel(QLabel):
         self.textalignment = Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWrapAnywhere
         self.isTextLabel = True
         self.align = None
+        self.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        self._minimum_height = 0
 
     def paintEvent(self, event):
         opt = QStyleOption()
@@ -65,6 +69,20 @@ class ModifiedQLabel(QLabel):
         self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, opt, painter, self)
 
         self.style().drawItemText(painter, self.rect(), self.textalignment, self.palette(), True, self.text())
+
+    def setMinimumHeight(self, height):
+        self._minimum_height = height
+
+    def heightForWidth(self, width):
+        metrics = QFontMetrics(self.font())
+
+        return metrics.boundingRect(0, 0, width, 0, self.textalignment, self.text()).height()
+
+    def sizeHint(self):
+        return QSize(self.width(), max(self._minimum_height, self.heightForWidth(self.width())))
+
+    def resizeEvent(self, event):
+        self.updateGeometry()
 
 
 class ProgressDelegate(QStyledItemDelegate):
