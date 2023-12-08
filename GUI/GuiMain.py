@@ -364,7 +364,9 @@ class MainWindow(QMainWindow):
     def validateUpdate(self, new_version, show=False):
         if new_version is None:
             if show:
-                self.m.warning(self, "Check for update failed", "Failed to check for update. Check log file for details.")
+                self.m.warning(
+                    self, "Check for update failed", "Failed to check for update. Check log file for details."
+                )
             return
         if packaging.version.Version(new_version) <= packaging.version.Version(__version__):
             if show:

@@ -68,11 +68,11 @@ def HSize(size):
         t += 1
         if t >= 6:
             break
-    return str(round(s, 3)) + u[t]
+    return ("%.3f" % s).rstrip("0").rstrip(".") + u[t]
 
 
 def InitializeFolder():
-    global logfile, pretrained, settingsFile, historyFile, configPath, settings, history
+    global logfile, pretrained, settingsFile, historyFile, configPath, settings, history, model_cache
     if sys.platform == "win32":
         configPath = pathlib.Path(os.environ["APPDATA"])
     elif sys.platform == "darwin" or sys.platform == "linux":
@@ -114,6 +114,9 @@ def InitializeFolder():
     else:
         history = {}
 
+    model_cache = pathlib.Path(GetSetting("model_cache", str(pretrained)))
+    (model_cache / "checkpoints").mkdir(parents=True, exist_ok=True)
+
 
 def SetSetting(attr, value):
     global settings, settingsFile, settingsLock
@@ -124,8 +127,9 @@ def SetSetting(attr, value):
             return
         settings[attr] = value
         try:
+            settings_write_data = json.dumps(settings, separators=(",", ":"))
             with open(str(settingsFile), mode="wt", encoding="utf8") as f:
-                f.write(json.dumps(settings, separators=(",", ":")))
+                f.write(settings_write_data)
         except:
             logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
 
@@ -144,8 +148,9 @@ def _SaveHistory():
     global history, historyFile, historyLock
     with historyLock:
         try:
+            history_write_data = lzma.compress(pickle.dumps(history), preset=7)
             with open(str(historyFile), mode="wb") as f:
-                f.write(lzma.compress(pickle.dumps(history), preset=7))
+                f.write(history_write_data)
         except:
             logging.warning("Failed to save history:\n%s" % traceback.format_exc())
 
