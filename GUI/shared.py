@@ -53,7 +53,7 @@ location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/a
 Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows or "/xxx" on macOS and \
 Linux) in case something unexpected would happen."""
 
-update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases/latest"
+update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
 
 settingsLock = threading.Lock()
 historyLock = threading.Lock()
@@ -92,7 +92,7 @@ def InitializeFolder():
             with open(str(settingsFile), mode="rt", encoding="utf8") as f:
                 settings_data = f.read()
                 settings = json.loads(settings_data)
-            if type(settings) != dict:
+            if type(settings) is not dict:
                 raise TypeError
         except:
             print("Settings file is corrupted, reset to default", file=sys.stderr)
@@ -105,7 +105,7 @@ def InitializeFolder():
         try:
             with open(str(historyFile), mode="rb") as f:
                 history = pickle.loads(lzma.decompress(f.read()))
-            if type(history) != dict:
+            if type(history) is not dict:
                 raise TypeError
         except:
             print("History file is corrupted, reset to default", file=sys.stderr)
@@ -169,7 +169,7 @@ def SetHistory(attr, value):
 def GetHistory(attr, default=None, autoset=True, use_ordered_set=False):
     global history
     if attr in history:
-        if (not use_ordered_set) or type(history[attr]) == ordered_set.OrderedSet:
+        if (not use_ordered_set) or type(history[attr]) is ordered_set.OrderedSet:
             return history[attr]
         return ordered_set.OrderedSet([history[attr]])
     else:
@@ -183,7 +183,7 @@ def GetHistory(attr, default=None, autoset=True, use_ordered_set=False):
 
 def AddHistory(attr, value):
     old_value = GetHistory(attr, ordered_set.OrderedSet(), False)
-    if type(old_value) != ordered_set.OrderedSet:
+    if type(old_value) is not ordered_set.OrderedSet:
         old_value = ordered_set.OrderedSet([old_value])
     SetHistory(attr, ordered_set.OrderedSet([value]) | old_value)
 
@@ -264,7 +264,7 @@ def checkUpdate(callback):
     try:
         logging.info("Checking for updates...")
         with urllib.request.urlopen(update_url) as f:
-            data = json.loads(f.read())
+            data = json.loads(f.read())[0]
         logging.info("Latest version: %s" % data["tag_name"])
         callback(data["tag_name"])
     except:

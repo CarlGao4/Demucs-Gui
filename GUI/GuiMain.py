@@ -368,7 +368,8 @@ class MainWindow(QMainWindow):
                     self, "Check for update failed", "Failed to check for update. Check log file for details."
                 )
             return
-        if packaging.version.Version(new_version) <= packaging.version.Version(__version__):
+        version_new = packaging.version.Version(new_version)
+        if version_new <= packaging.version.Version(__version__):
             if show:
                 self.m.information(self, "No update available", "You are using the latest version.")
             return
@@ -376,8 +377,8 @@ class MainWindow(QMainWindow):
             self.m.question(
                 self,
                 "Update available",
-                "A new version (%s) of Demucs GUI is available. Do you want to visit GitHub to download it?"
-                % new_version,
+                "A new version (%s) of Demucs GUI is available. Do you want to visit GitHub to download it?%s"
+                % (new_version, "\nWarning: this is a pre-release version." if version_new.is_prerelease else ""),
                 self.m.StandardButton.Yes,
                 self.m.StandardButton.No,
             )
