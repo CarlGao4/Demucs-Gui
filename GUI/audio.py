@@ -105,20 +105,13 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     command += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
     p = shared.Popen(command)
     logging.debug("ffmpeg command: %s" % shlex.join(p.args))
-    ffmpeg_output = b""
-    wav_buffer = io.BytesIO()
-    while True:
-        wav_buffer.write(p.stdout.read(1024))
-        ffmpeg_output += p.stderr.read(1024)
-        if p.poll() is not None:
-            break
-    if ffmpeg_output:
-        logging.warning("ffmpeg output:\n" + ffmpeg_output.decode())
+    ffmpeg_output, ffmpeg_log = p.communicate()
+    wav_buffer = io.BytesIO(ffmpeg_output)
+    del ffmpeg_output
+    if ffmpeg_log:
+        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode())
     assert p.returncode == 0, "FFmpeg failed with code %d" % p.returncode
     wav_buffer.seek(0)
-    ffmpeg_log = p.stderr.read().decode()
-    if ffmpeg_log:
-        logging.debug(p.stderr.read().decode())
     audio, sr = soundfile.read(wav_buffer, dtype="float32", always_2d=True)
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
     assert audio.shape[0] > 0, "Audio is empty"
