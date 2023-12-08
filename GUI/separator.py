@@ -108,7 +108,7 @@ def autoListModels():
     global downloaded_models, remote_urls
     bags = []
     singles = []
-    custom_repo = shared.GetSetting("custom_repo", {})
+    custom_repo = shared.GetSetting("custom_repo", [])
     repos = [shared.homeDir / "pretrained", shared.pretrained]
     repos += [pathlib.Path(i) for i in custom_repo]
     repos += [None]
