@@ -1,4 +1,4 @@
-__version__ = "1.1a1"
+__version__ = "1.1a2"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
@@ -987,13 +987,13 @@ class FileQueue(QWidget):
                 shared.FileStatus.Failed,
             ]:
                 continue
-            self.table.removeRow(i)
             if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
                 shared.FileStatus.Queued,
                 shared.FileStatus.Paused,
             ]:
                 self.queue_length -= 1
                 main_window.updateQueueLength()
+            self.table.removeRow(i)
 
     def pause(self):
         indexes = list(set(i.row() for i in self.table.selectedIndexes()))
