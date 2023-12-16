@@ -1,0 +1,3 @@
+[submodule "GUI/qt_table_checkbox"]
+	path = GUI/qt_table_checkbox
+	url = https://github.com/CarlGao4/QTableWidget-with-checkbox.git
