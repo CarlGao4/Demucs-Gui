@@ -17,12 +17,14 @@
 import shared
 
 if not shared.use_PyQt6:
-    from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QSize, Qt
-    from PySide6.QtGui import QAction, QFontMetrics, QPainter
+    from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt
+    from PySide6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator
     from PySide6.QtWidgets import (
         QApplication,
         QLabel,
+        QLineEdit,
         QSizePolicy,
+        QSpinBox,
         QStyle,
         QStyleFactory,
         QStyledItemDelegate,
@@ -30,13 +32,19 @@ if not shared.use_PyQt6:
         QStyleOptionProgressBar,
         QStyleOptionViewItem,
     )
+    from qt_table_checkbox.side6_table_checkbox import (
+        NotImplementedWarning,
+        QTableWidgetWithCheckBox as QTableWidgetWithCheckBox,
+    )
 else:
-    from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, Qt  # type: ignore
-    from PyQt6.QtGui import QAction, QFontMetrics, QPainter  # type: ignore
+    from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, Qt  # type: ignore
+    from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
         QLabel,
+        QLineEdit,
         QSizePolicy,
+        QSpinBox,
         QStyle,
         QStyleFactory,
         QStyledItemDelegate,
@@ -44,10 +52,18 @@ else:
         QStyleOptionProgressBar,
         QStyleOptionViewItem,
     )
+    from qt_table_checkbox.qt6_table_checkbox import (  # type: ignore
+        NotImplementedWarning,
+        QTableWidgetWithCheckBox as QTableWidgetWithCheckBox,
+    )
 
-from typing import Union
+from typing import Callable, Union
 
 import sys
+import warnings
+
+
+warnings.filterwarnings("ignore", category=NotImplementedWarning)
 
 
 # Modified so that text can be wrapped everywhere
@@ -85,6 +101,87 @@ class ModifiedQLabel(QLabel):
         self.updateGeometry()
 
 
+class DelegateCombiner(QStyledItemDelegate):
+    """So that we can use multiple delegates in the same QTableView. Will also count editors."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._delegates = []
+        self._editors = 0
+    
+    def addDelegate(self, delegate: QStyledItemDelegate, condition: Callable[[Union[QModelIndex, QPersistentModelIndex]], bool]):
+        self._delegates.append((delegate, condition))
+
+    @property
+    def editors(self):
+        return self._editors
+
+    # Distribute QStyledItemDelegate methods to the delegates
+
+    def createEditor(self, parent, option, index):
+        self._editors += 1
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.createEditor(parent, option, index)
+        return super().createEditor(parent, option, index)
+    
+    def editorEvent(self, event, model, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.editorEvent(event, model, option, index)
+        return super().editorEvent(event, model, option, index)
+    
+    def initStyleOption(self, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.initStyleOption(option, index)
+        return super().initStyleOption(option, index)
+    
+    def paint(self, painter, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.paint(painter, option, index)
+        return super().paint(painter, option, index)
+    
+    def setEditorData(self, editor, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.setEditorData(editor, index)
+        return super().setEditorData(editor, index)
+    
+    def setModelData(self, editor, model, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.setModelData(editor, model, index)
+        return super().setModelData(editor, model, index)
+    
+    def sizeHint(self, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.sizeHint(option, index)
+        return super().sizeHint(option, index)
+    
+    def updateEditorGeometry(self, editor, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.updateEditorGeometry(editor, option, index)
+        return super().updateEditorGeometry(editor, option, index)
+    
+    # Distribute QAbstractItemDelegate methods to the delegates
+
+    def destroyEditor(self, editor, index):
+        self._editors -= 1
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.destroyEditor(editor, index)
+        return super().destroyEditor(editor, index)
+    
+    def helpEvent(self, event, view, option, index):
+        for delegate, condition in self._delegates:
+            if condition(index):
+                return delegate.helpEvent(event, view, option, index)
+        return super().helpEvent(event, view, option, index)
+
+
 class ProgressDelegate(QStyledItemDelegate):
     ProgressRole = Qt.ItemDataRole.UserRole + 0x1000
     TextRole = Qt.ItemDataRole.UserRole + 0x1001
@@ -106,6 +203,64 @@ class ProgressDelegate(QStyledItemDelegate):
             fusion.drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
         else:
             QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+
+
+# Modified from https://doc.qt.io/qtforpython-6/examples/example_widgets_itemviews_spinboxdelegate.html
+class PercentSpinBoxDelegate(QStyledItemDelegate):
+    """A delegate that allows the user to change integer values from the model
+    using a spin box widget."""
+
+    def __init__(self, parent=None, minimum=0, maximum=100, step=1):
+        super().__init__(parent)
+        self.minimum = minimum
+        self.maximum = maximum
+        self.step = step
+
+    def createEditor(self, parent, option, index):
+        editor = QSpinBox(parent)
+        editor.setFrame(False)
+        editor.setMinimum(self.minimum)
+        editor.setMaximum(self.maximum)
+        editor.setSingleStep(self.step)
+        editor.setSuffix("%")
+        return editor
+
+    def setEditorData(self, editor: QSpinBox, index):
+        value = index.model().data(index, Qt.ItemDataRole.EditRole)
+        value = int(value[:-2])
+        editor.setValue(value)
+
+    def setModelData(self, editor: QSpinBox, model, index):
+        editor.interpretText()
+        value = editor.value()
+        model.setData(index, str(value) + "%\u3000", Qt.ItemDataRole.EditRole)
+
+    def updateEditorGeometry(self, editor: QSpinBox, option, index):
+        editor.setGeometry(option.rect)
+
+
+class FileNameDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def createEditor(self, parent, option, index):
+        editor = QLineEdit(parent)
+        PathRe = QRegularExpression(r"^[^\\/:*?\"<>|]+$")
+        validator = QRegularExpressionValidator(PathRe)
+        editor.setValidator(validator)
+        editor.setFrame(False)
+        return editor
+
+    def setEditorData(self, editor: QLineEdit, index):
+        value = str(index.model().data(index, Qt.ItemDataRole.EditRole))
+        editor.setText(value)
+
+    def setModelData(self, editor: QLineEdit, model, index):
+        value = editor.text()
+        model.setData(index, value, Qt.ItemDataRole.EditRole)
+
+    def updateEditorGeometry(self, editor: QLineEdit, option, index):
+        editor.setGeometry(option.rect)
 
 
 # A simpler QAction that can be created with a callback

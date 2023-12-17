@@ -57,8 +57,7 @@ if not shared.use_PyQt6:
     )
 else:
     from PyQt6 import QtGui  # type: ignore
-    from PyQt6.QtCore import Qt, QTimer  # type: ignore
-    from PyQt6.QtCore import pyqtSignal as Signal  # type: ignore
+    from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QAbstractItemView,
         QApplication,
@@ -112,7 +111,15 @@ import traceback
 import webbrowser
 
 import separator
-from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
+from PySide6_modified import (
+    Action,
+    DelegateCombiner,
+    ModifiedQLabel,
+    FileNameDelegate,
+    PercentSpinBoxDelegate,
+    ProgressDelegate,
+    QTableWidgetWithCheckBox,
+)
 
 file_queue_lock = threading.Lock()
 
@@ -261,9 +268,11 @@ class MainWindow(QMainWindow):
         self.options_tab.setLayout(QVBoxLayout())
         self.options_tab.layout().addWidget(self.param_settings)
         self.options_tab.layout().addWidget(self.save_options)
+        self.mixer = Mixer()
         self.file_queue = FileQueue()
         self.separation_control = SeparationControl()
         self.tab_widget.addTab(self.options_tab, "Options")
+        self.tab_widget.addTab(self.mixer, self.mixer.widget_title)
         self.tab_widget.addTab(self.file_queue, self.file_queue.widget_title % self.file_queue.queue_length)
         self.widget_layout.addWidget(self.separation_control)
 
@@ -774,10 +783,10 @@ class SaveOptions(QGroupBox):
             self.loc_input.setCurrentText(p)
 
     @shared.thread_wrapper(daemon=True)
-    def save(self, file, tensor, save_func, item, finishCallback):
+    def save(self, file, origin, tensor, save_func, item, finishCallback):
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
-        for stem, stem_data in tensor.items():
+        for stem, stem_data in main_window.mixer.mix(origin, tensor):
             file_path_str = self.loc_input.currentText().format(
                 track=file.stem,
                 trackext=file.name,
@@ -1035,6 +1044,145 @@ class FileQueue(QWidget):
                     return i
             self.setEnabled(True)
             return None
+
+
+class DelegateCallback(DelegateCombiner):
+    def __init__(self, mixer: "Mixer", parent=None):
+        super().__init__(parent)
+        self._mixer = mixer
+
+    def createEditor(self, parent, option, index):
+        self._mixer.slider.setEnabled(False)
+        return super().createEditor(parent, option, index)
+
+    def destroyEditor(self, editor, index):
+        ret = super().destroyEditor(editor, index)
+        if super().editors == 0:
+            self._mixer.slider.setEnabled(True)
+        self._mixer.selectedItemChanged(*(self._mixer.outputs_table.currentItem(),) * 2)
+        return ret
+
+
+class Mixer(QWidget):
+    widget_title = "Mixer"
+
+    def __init__(self):
+        super().__init__()
+
+        self.outputs_table = QTableWidgetWithCheckBox()
+        self.outputs_table.setColumnCount(len(main_window.separator.sources) + 2)
+        self.outputs_table.setHorizontalHeaderLabels(["Stem name", "origin"] + list(main_window.separator.sources))
+
+        self.outputs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.outputs_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.outputs_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        self.outputs_table.setAlternatingRowColors(True)
+        self.outputs_table.setVerticalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.outputs_table.setHorizontalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.outputs_table.currentItemChanged.connect(self.selectedItemChanged)
+
+        self.delegate = DelegateCallback(self)
+        self.delegate.addDelegate(FileNameDelegate(), lambda x: x.column() == 1)
+        self.delegate.addDelegate(PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1), lambda x: x.column() > 1)
+        self.outputs_table.setItemDelegate(self.delegate)
+
+        # Single stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                [stem]
+                + ["100%\u3000" if idx + 1 == j else "0%\u3000" for j in range(len(main_window.separator.sources) + 1)],
+                True,
+            )
+
+        # Minus stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                ["minus_" + stem]
+                + [
+                    "100%\u3000" if j == 0 else "-100%\u3000" if idx + 1 == j else "0%\u3000"
+                    for j in range(len(main_window.separator.sources) + 1)
+                ],
+                False,
+            )
+
+        # Mixed stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                ["no_" + stem]
+                + [
+                    "0%\u3000" if j == 0 or idx + 1 == j else "100%\u3000"
+                    for j in range(len(main_window.separator.sources) + 1)
+                ],
+                False,
+            )
+
+        self.remove_button = QPushButton()
+        self.remove_button.setText("Remove")
+        self.remove_button.clicked.connect(self.removeSelected)
+
+        self.add_button = QPushButton()
+        self.add_button.setText("Add")
+        self.add_button.clicked.connect(self.addStem)
+
+        self.slider = QSlider()
+        self.slider.setOrientation(Qt.Orientation.Horizontal)
+        self.slider.setRange(-500, 500)
+
+        self.slider.valueChanged.connect(self.sliderValueChanged)
+
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.outputs_table)
+        self.button_layout = QHBoxLayout()
+        self.button_layout.addWidget(self.remove_button)
+        self.button_layout.addWidget(self.add_button)
+        self.layout.addLayout(self.button_layout)
+        self.layout.addWidget(self.slider)
+        self.setLayout(self.layout)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
+            self.removeSelected()
+
+    def removeSelected(self):
+        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
+        for i in indexes:
+            self.outputs_table.removeRow(i)
+
+    def addStem(self):
+        self.outputs_table.addRow(["stem"] + ["0%\u3000" for _ in range(len(main_window.separator.sources) + 1)], True)
+
+    def resizeEvent(self, event=None) -> None:
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        required_width = self.outputs_table.columnWidth(0)
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        if required_width > self.outputs_table.columnWidth(0):
+            self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+
+    def selectedItemChanged(self, current, previous):
+        if current is not None and current.column() != 1:
+            self.slider.setValue(int(current.data(Qt.ItemDataRole.EditRole)[:-2]))
+
+    def sliderValueChanged(self, value):
+        if self.slider.hasFocus():
+            for i in self.outputs_table.selectedItems():
+                if i.column() != 1:
+                    i.setData(Qt.ItemDataRole.EditRole, str(value) + "%\u3000")
+
+    def mix(self, origin: "separator.torch.Tensor", separated: "dict[str, separator.torch.Tensor]"):
+        for i in range(self.outputs_table.rowCount()):
+            if self.outputs_table.getCheckState(i):
+                stem = self.outputs_table.item(i, 0).text()
+                out = origin.clone()
+                out *= float(self.outputs_table.item(i, 1).data(Qt.ItemDataRole.EditRole)[:-2]) / 100
+                for j in range(self.outputs_table.columnCount() - 2):
+                    source = self.outputs_table.horizontalHeaderItem(j + 2).text()
+                    out += (
+                        separated[source]
+                        * float(self.outputs_table.item(i, j + 2).data(Qt.ItemDataRole.EditRole)[:-2])
+                        / 100
+                    )
+                yield stem, out
 
 
 class SeparationControl(QWidget):

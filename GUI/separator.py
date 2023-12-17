@@ -280,7 +280,6 @@ class Separator:
     def modelInfo(self):
         channels = self.separator.model.audio_channels
         samplerate = self.separator.model.samplerate
-        sources = self.separator.model.sources
         if isinstance(self.separator.model, demucs.apply.BagOfModels):
             infos = []
             weights = self.separator.model.weights
@@ -302,7 +301,7 @@ class Separator:
                     self.repo if self.repo is not None else '"remote"',
                     channels,
                     samplerate,
-                    ", ".join(sources),
+                    ", ".join(self.sources),
                     "\n".join(infos),
                 )
             )
@@ -313,7 +312,7 @@ class Separator:
             self.separator.model.__class__.__name__,
             channels,
             samplerate,
-            ", ".join(sources),
+            ", ".join(self.sources),
         )
 
     def startSeparate(self, *args, **kwargs):
@@ -414,9 +413,7 @@ class Separator:
             logging.info("Running separation...")
             self.time_hists.append((time.time(), 0))
             if src_channels != self.separator.model.audio_channels:
-                out = {}
-                for stem in self.separator.model.sources:
-                    out[stem] = torch.zeros(src_channels, wav_torch.shape[1], dtype=torch.float32)
+                out = {stem: torch.zeros(1, wav_torch.shape[1], dtype=torch.float32) for stem in self.sources}
                 self.in_length = src_channels
                 self.out_length = 0
                 for i in range(src_channels):
@@ -439,6 +436,6 @@ class Separator:
             self.separating = False
             return
         logging.info("Saving separated audio...")
-        save_callback(file, out, self.save_callback, item, finishCallback)
+        save_callback(file, wav_torch, out, self.save_callback, item, finishCallback)
         self.separating = False
         return
