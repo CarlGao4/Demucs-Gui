@@ -1,5 +1,19 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.1a1*
+Release date: Dec. 8, 2023
+
+#### Updates
+1. Use the new tabbed UI
+2. Add new option: separate once added to the queue
+3. Save settings history for separate-once-added, file format, save location and clip mode
+
+#### Fixes
+1. Will show download progress if a remote model is not downloaded
+> In previous versions, Demucs-GUI will not change the default torch hub cache dir. However, from this version, all new models will be downloaded to `Demucs-GUI.config.dir/pretrained/checkpoints`, without copying the old ones there. So you need to copy it manually if you still need those models.
+2. Fix auto check updates doesn't work
+3. Fix model info can't be shown completely sometimes
+
 ### 1.0.2.1
 Release date: Nov. 28, 2023
 

@@ -2,7 +2,7 @@
 
 **Everybody is welcomed to contribute to this document! Please refer to [#23](https://github.com/CarlGao4/Demucs-Gui/discussions/23) for more information.**
 
-**This document is written for 1.0 or newer versions (including beta versions like 1.0a1).**
+**This document is written for 1.0 or newer versions (including beta versions like 1.0a1). A function without version information means that it is available from 1.0a1.**
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ If the application cannot be launched due to the Mac's security protection featu
 
 </details>
 
-4. Load a model. The default model packed with Demucs GUI is `htdemucs`. Click on `load` button to load. If you have chosen a remote model and are using it for the first time, it will be downloaded automatically. During this period of time, there will be no outputs and the whole window will be frozen. Please be patient.
+4. Load a model. The default model packed with Demucs GUI is `htdemucs`. Click on `load` button to load. If you have chosen a remote model and are using it for the first time, it will be downloaded automatically. ~~During this period of time, there will be no outputs and the whole window will be frozen. Please be patient.~~ *\*From 1.1a1, download progress will be shown in the status bar.*
 
 5. Add your audio file. You can drag and drop your audio file to the window, or choose files and folders (recursively).
 
@@ -53,7 +53,26 @@ Model list will be updated automatically after you add or remove a repo. You can
 
 The order of listed models is bag of models (yaml file) first, and single models (th file) goes after them. Models with same name from different repos can be listed multiple times, so you should take a look at the info area of the selected model before loading it.
 
-Once you've loaded a model, you can't load another model or unload it. The only way to unload a model is to restart Demucs GUI.
+Once you've loaded a model, you can't load another model or unload it. The only way to unload a model is to restart Demucs GUI. I know that this may be annoying, but it's impossible to know the sources of a model after loading it, so the first thing you must do after launching Demucs GUI is to load a model so other functions (like the mixer) can be initialized. As a result, I only added a "restart" button to the menu bar. *\*New in 1.1a2*
+
+### Mixer
+*\*New in 1.1a2*
+
+With mixer, you can mix different stems of a song together. This is more convenient than using a DAW when your purpose is simple (like just removing vocals from a song).
+
+On default, Demucs GUI has following presets:
+
+1. "Single stems": Do not mix at all, save the outputs of each stem separately. This is enabled by default.
+2. "Minus stems": Extract the specific stem from original audio (Or, original audio minus the specific stem).
+3. "No stems": Mix all the stems except the specific stem together.
+
+These presets are created for each stem.
+
+You can enable or disable a stem by clicking on the checkbox on the left of the stem name. If you've selected more than one cells and clicked on a checkbox whose row has been selected, all the selected cells will be enabled or disabled.
+
+Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer.
+
+You can also add your own stems by clicking "Add" button. Remember that do not enable a stem with the same name as an existing stem. The behavior of this is undefined.
 
 ### Some "useless" functions of separation queue
 
@@ -133,6 +152,12 @@ An array of custom repos. This can be set inside the application (click on `adva
 type: `boolean`
 
 See [Some "useless" functions of separation queue](#Some-useless-functions-of-separation-queue) 3rd point.
+
+### `model_cache`
+
+type: `string`
+
+The path to the model cache, where the downloaded remote models will be saved and seeked. The default value is same as the default custom repo (On Windows, it is `%APPDATA%\demucs-gui\pretrained`; On macOS and Linux, it is `~/.config/demucs-gui/pretrained`). Due to the implementation of torch hub, Demucs GUI will create a new folder named `checkpoints` under the model cache folder and put all the downloaded models there. If you've changed the model cache folder, please copy the old models to the new folder. *\*New in 1.1a1*
 
 ## Q&A
 
