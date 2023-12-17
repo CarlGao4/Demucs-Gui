@@ -37,7 +37,7 @@ if not shared.use_PyQt6:
         QTableWidgetWithCheckBox as QTableWidgetWithCheckBox,
     )
 else:
-    from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, Qt  # type: ignore
+    from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt  # type: ignore
     from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
@@ -103,12 +103,15 @@ class ModifiedQLabel(QLabel):
 
 class DelegateCombiner(QStyledItemDelegate):
     """So that we can use multiple delegates in the same QTableView. Will also count editors."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._delegates = []
         self._editors = 0
-    
-    def addDelegate(self, delegate: QStyledItemDelegate, condition: Callable[[Union[QModelIndex, QPersistentModelIndex]], bool]):
+
+    def addDelegate(
+        self, delegate: QStyledItemDelegate, condition: Callable[[Union[QModelIndex, QPersistentModelIndex]], bool]
+    ):
         self._delegates.append((delegate, condition))
 
     @property
@@ -123,49 +126,49 @@ class DelegateCombiner(QStyledItemDelegate):
             if condition(index):
                 return delegate.createEditor(parent, option, index)
         return super().createEditor(parent, option, index)
-    
+
     def editorEvent(self, event, model, option, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.editorEvent(event, model, option, index)
         return super().editorEvent(event, model, option, index)
-    
+
     def initStyleOption(self, option, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.initStyleOption(option, index)
         return super().initStyleOption(option, index)
-    
+
     def paint(self, painter, option, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.paint(painter, option, index)
         return super().paint(painter, option, index)
-    
+
     def setEditorData(self, editor, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.setEditorData(editor, index)
         return super().setEditorData(editor, index)
-    
+
     def setModelData(self, editor, model, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.setModelData(editor, model, index)
         return super().setModelData(editor, model, index)
-    
+
     def sizeHint(self, option, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.sizeHint(option, index)
         return super().sizeHint(option, index)
-    
+
     def updateEditorGeometry(self, editor, option, index):
         for delegate, condition in self._delegates:
             if condition(index):
                 return delegate.updateEditorGeometry(editor, option, index)
         return super().updateEditorGeometry(editor, option, index)
-    
+
     # Distribute QAbstractItemDelegate methods to the delegates
 
     def destroyEditor(self, editor, index):
@@ -174,7 +177,7 @@ class DelegateCombiner(QStyledItemDelegate):
             if condition(index):
                 return delegate.destroyEditor(editor, index)
         return super().destroyEditor(editor, index)
-    
+
     def helpEvent(self, event, view, option, index):
         for delegate, condition in self._delegates:
             if condition(index):

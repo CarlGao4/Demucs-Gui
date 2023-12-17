@@ -1129,6 +1129,7 @@ class Mixer(QWidget):
         self.slider.setOrientation(Qt.Orientation.Horizontal)
         self.slider.setRange(-500, 500)
 
+        self.slider_value_changed_by_user = True
         self.slider.valueChanged.connect(self.sliderValueChanged)
 
         self.layout = QVBoxLayout()
@@ -1161,18 +1162,22 @@ class Mixer(QWidget):
 
     def selectedItemChanged(self, current, previous):
         if current is not None and current.column() != 1:
+            self.slider_value_changed_by_user = False
             self.slider.setValue(int(current.data(Qt.ItemDataRole.EditRole)[:-2]))
 
     def sliderValueChanged(self, value):
-        if self.slider.hasFocus():
+        if self.slider_value_changed_by_user:
             for i in self.outputs_table.selectedItems():
                 if i.column() != 1:
                     i.setData(Qt.ItemDataRole.EditRole, str(value) + "%\u3000")
+        else:
+            self.slider_value_changed_by_user = True
 
     def mix(self, origin: "separator.torch.Tensor", separated: "dict[str, separator.torch.Tensor]"):
         for i in range(self.outputs_table.rowCount()):
             if self.outputs_table.getCheckState(i):
                 stem = self.outputs_table.item(i, 0).text()
+                logging.info("Mixing stem %s" % stem)
                 out = origin.clone()
                 out *= float(self.outputs_table.item(i, 1).data(Qt.ItemDataRole.EditRole)[:-2]) / 100
                 for j in range(self.outputs_table.columnCount() - 2):
@@ -1376,6 +1381,17 @@ if __name__ == "__main__":
         "System free memory: %d (%s)" % (psutil.virtual_memory().free, shared.HSize(psutil.virtual_memory().free))
     )
     logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+
+    if shared.use_PyQt6:
+        import PyQt6.QtCore
+        logging.info("Using PyQt6")
+        logging.info("Qt version: %s" % PyQt6.QtCore.QT_VERSION_STR)
+        logging.info("PyQt6 version: %s" % PyQt6.QtCore.PYQT_VERSION_STR)
+    else:
+        import PySide6.QtCore
+        logging.info("Using PySide6")
+        logging.info("Qt version: %s" % PySide6.QtCore.qVersion())
+        logging.info("PySide6 version: %s" % PySide6.__version__)
 
     app = QApplication([])
     starting_window = StartingWindow()
