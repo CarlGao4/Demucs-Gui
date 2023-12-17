@@ -104,6 +104,7 @@ import platform
 import psutil
 import random
 import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -242,6 +243,7 @@ class MainWindow(QMainWindow):
             self,
             lambda: shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x, show=True))),
         )
+        self.menu_restart = Action("Restart", self, self.restart)
         self.menu_about_log = Action("Open log", self, self.open_log)
         self.menu_about.addActions(
             [
@@ -249,11 +251,14 @@ class MainWindow(QMainWindow):
                 self.menu_about_usage,
                 self.menu_clear_history,
                 self.menu_check_update,
+                self.menu_restart,
                 self.menu_about_log,
             ]
         )
         self.menubar.addAction(self.menu_about.menuAction())
         self.setMenuBar(self.menubar)
+
+        self.restarting = False
 
         shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x)))
 
@@ -294,7 +299,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if (
-            (not hasattr(self, "separator"))
+            self.restarting
+            or (not hasattr(self, "separator"))
             or (not (self.separator.separating or self.save_options.saving))
             or (
                 self.m.question(
@@ -407,6 +413,25 @@ class MainWindow(QMainWindow):
             == self.m.StandardButton.Yes
         ):
             shared.ResetHistory()
+
+    def restart(self):
+        if (
+            (not hasattr(self, "separator"))
+            or (not (self.separator.separating or self.save_options.saving))
+            or (
+                self.m.question(
+                    self,
+                    "Separation in progress",
+                    "Separation is not finished, restart anyway?",
+                    self.m.StandardButton.Yes,
+                    self.m.StandardButton.Cancel,
+                )
+                == self.m.StandardButton.Yes
+            )
+        ):
+            subprocess.Popen(sys.orig_argv)
+            self.restarting = True
+            self.close()
 
 
 class ModelSelector(QWidget):
@@ -1384,11 +1409,13 @@ if __name__ == "__main__":
 
     if shared.use_PyQt6:
         import PyQt6.QtCore
+
         logging.info("Using PyQt6")
         logging.info("Qt version: %s" % PyQt6.QtCore.QT_VERSION_STR)
         logging.info("PyQt6 version: %s" % PyQt6.QtCore.PYQT_VERSION_STR)
     else:
         import PySide6.QtCore
+
         logging.info("Using PySide6")
         logging.info("Qt version: %s" % PySide6.QtCore.qVersion())
         logging.info("PySide6 version: %s" % PySide6.__version__)
