@@ -1171,8 +1171,12 @@ class Mixer(QWidget):
             self.removeSelected()
 
     def removeSelected(self):
+        if max(i.row() for i in self.outputs_table.selectedIndexes()) < len(main_window.separator.sources) * 3:
+            main_window.showError.emit("Cannot remove default stems", "Cannot remove default stems")
         indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
         for i in indexes:
+            if i < len(main_window.separator.sources) * 3:
+                break
             self.outputs_table.removeRow(i)
 
     def addStem(self):
