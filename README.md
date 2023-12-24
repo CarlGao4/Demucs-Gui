@@ -5,6 +5,16 @@ This is a GUI for music separation project `demucs`.
 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/adefossez/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases.
 
+### Donate to me
+
+**Currently I'm training some new great models (like 10-stem model) for this project. However as a student I don't have enough money to rent powerful GPUs. With your help, I can train the new models up to 100x faster. I promise I will use the money only for training models and will release the models to the public for free as long as I can raise $150.**
+
+**If you like this project, please consider donating to me.**
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/CarlGao4) [paypal.me/CarlGao4](https://paypal.me/CarlGao4)
+
+[![Donate](https://img.shields.io/badge/Donate-AliPay-blue.svg)](./donate_alipay.jpg) [AliPay QR Code](./donate_alipay.jpg)
+
 <details id="CannotOpen">
   <summary>Note for macOS users</summary>
 
