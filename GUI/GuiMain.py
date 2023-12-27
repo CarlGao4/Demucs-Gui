@@ -131,7 +131,7 @@ class StartingWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
-        self.opacity = 0
+        self.opacity = 0.0
         self.setWindowOpacity(self.opacity)
         self.setWindowTitle("Demucs GUI %s" % __version__)
         self.timer = QTimer()
@@ -1157,14 +1157,14 @@ class Mixer(QWidget):
         self.slider_value_changed_by_user = True
         self.slider.valueChanged.connect(self.sliderValueChanged)
 
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.outputs_table)
+        self.widget_layout = QVBoxLayout()
+        self.widget_layout.addWidget(self.outputs_table)
         self.button_layout = QHBoxLayout()
         self.button_layout.addWidget(self.remove_button)
         self.button_layout.addWidget(self.add_button)
-        self.layout.addLayout(self.button_layout)
-        self.layout.addWidget(self.slider)
-        self.setLayout(self.layout)
+        self.widget_layout.addLayout(self.button_layout)
+        self.widget_layout.addWidget(self.slider)
+        self.setLayout(self.widget_layout)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):

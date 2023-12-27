@@ -1,6 +1,7 @@
-# Please install torch with cuda manually before installing this! 
+--extra-index-url https://download.pytorch.org/whl/cu118
 
-demucs>=4.1.0a2
+# demucs>=4.1.0a2
+git+https://github.com/adefossez/demucs.git  # Use git repo as it 4.1.0 hasn't been pushed to PyPI
 numpy
 psutil>=5.7.0
 pyperclip

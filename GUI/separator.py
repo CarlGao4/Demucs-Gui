@@ -45,6 +45,15 @@ remote_urls = {}
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
     global torch, demucs, audio
     import torch
+
+    try:
+        global ipex
+        ipex = False
+        import intel_extension_for_pytorch as ipex  # type: ignore
+    except ModuleNotFoundError:
+        logging.info("Intel Extension for PyTorch is not installed")
+    except:
+        logging.error("Failed to load Intel Extension for PyTorch:\n" + traceback.format_exc())
     import demucs.api
     import demucs.apply
     import audio
@@ -64,8 +73,10 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
                 "CUDA Info: "
                 + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
             )
+        elif ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
+            update_status("Intel MKL backend is available")
         else:
-            update_status("CUDA backend is not available")
+            update_status("No accelerator backend is available")
     time.sleep(1)
     ffmpeg_version = audio.checkFFMpeg()
     if not ffmpeg_version:
@@ -88,7 +99,25 @@ def getAvailableDevices():
         else:
             logging.info("MPS backend is not available")
     else:
-        if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
+            max_memory = 0
+            for i in range(torch.xpu.device_count()):
+                device_property = torch.xpu.get_device_properties(i)
+                device_info_string = ""
+                if hasattr(device_property, "dev_type") and isinstance(device_property.dev_type, str):
+                    device_info_string += device_property.dev_type.upper() + " - "
+                device_info_string += device_property.name
+                if hasattr(device_property, "platform_name") and isinstance(device_property.platform_name, str):
+                    device_info_string += " (" + device_property.platform_name + ", "
+                else:
+                    device_info_string += " ("
+                device_info_string += "%d MiB)" % (device_property.total_memory / 1048576)
+                devices.append((device_info_string, "xpu:%d" % i))
+                if device_property.total_memory > max_memory and device_property.total_memory > 2147480000:
+                    max_memory = device_property.total_memory
+                    if hasattr(device_property, "support_fp64") and device_property.support_fp64:
+                        default_device = len(devices) - 1
+        elif torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0
             for i in range(torch.cuda.device_count()):
                 device_property = torch.cuda.get_device_properties(i)
@@ -100,7 +129,7 @@ def getAvailableDevices():
                 )
                 if device_property.total_memory > max_memory and device_property.total_memory > 2147480000:
                     max_memory = device_property.total_memory
-                    default_device = i + 1
+                    default_device = len(devices) - 1
     return devices
 
 
@@ -228,7 +257,7 @@ class Separator:
             raise RuntimeError(err)
         self.updateStatus("Downloading model %s" % model)
         logging.info("Downloading model %s from %s" % (model, url))
-        next_update = 0
+        next_update = 0.0
         req = urllib.request.Request(url, headers={"User-Agent": "torch.hub"})
         u = urllib.request.urlopen(req)
         meta = u.info()

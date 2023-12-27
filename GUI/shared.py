@@ -245,6 +245,11 @@ def thread_wrapper(*args_thread, **kw_thread):
                 )
                 try:
                     func(*args, **kwargs)
+                except:
+                    logging.error(
+                        "[%d] Thread %s (%s) failed:\n%s"
+                        % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name, traceback.format_exc())
+                    )
                 finally:
                     logging.info(
                         "[%d] Thread %s (%s) ends" % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name)

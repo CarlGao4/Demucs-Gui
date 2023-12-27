@@ -228,17 +228,17 @@ class PercentSpinBoxDelegate(QStyledItemDelegate):
         editor.setSuffix("%")
         return editor
 
-    def setEditorData(self, editor: QSpinBox, index):
+    def setEditorData(self, editor: QSpinBox, index):  # type: ignore[override]
         value = index.model().data(index, Qt.ItemDataRole.EditRole)
         value = int(value[:-2])
         editor.setValue(value)
 
-    def setModelData(self, editor: QSpinBox, model, index):
+    def setModelData(self, editor: QSpinBox, model, index):  # type: ignore[override]
         editor.interpretText()
         value = editor.value()
         model.setData(index, str(value) + "%\u3000", Qt.ItemDataRole.EditRole)
 
-    def updateEditorGeometry(self, editor: QSpinBox, option, index):
+    def updateEditorGeometry(self, editor: QSpinBox, option, index):  # type: ignore[override]
         editor.setGeometry(option.rect)
 
 
@@ -254,15 +254,15 @@ class FileNameDelegate(QStyledItemDelegate):
         editor.setFrame(False)
         return editor
 
-    def setEditorData(self, editor: QLineEdit, index):
+    def setEditorData(self, editor: QLineEdit, index):  # type: ignore[override]
         value = str(index.model().data(index, Qt.ItemDataRole.EditRole))
         editor.setText(value)
 
-    def setModelData(self, editor: QLineEdit, model, index):
+    def setModelData(self, editor: QLineEdit, model, index):  # type: ignore[override]
         value = editor.text()
         model.setData(index, value, Qt.ItemDataRole.EditRole)
 
-    def updateEditorGeometry(self, editor: QLineEdit, option, index):
+    def updateEditorGeometry(self, editor: QLineEdit, option, index):  # type: ignore[override]
         editor.setGeometry(option.rect)
 
 
