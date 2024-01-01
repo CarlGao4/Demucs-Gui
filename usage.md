@@ -9,8 +9,10 @@
 1. Download the latest version of Demucs GUI from [GitHub Releases](https://github.com/CarlGao4/Demucs-Gui/releases) or [FossHUB](https://www.fosshub.com/Demucs-GUI.html). There are different download types:
 - `CUDA Windows 64-bit`: For Windows users with NVIDIA GPU (whose compute capability is greater than 3.5).
 - `CPU Windows 64-bit`: For Windows users without NVIDIA GPU.
+- `MKL Windows 64-bit`: For Windows users with Intel GPU (Intel Arc & Intel Xe). Not recommended to users who only have integrated Intel GPU.
 <!-- - `ROCm Windows 64-bit`: For Windows users with AMD GPU. -->
 - `CPU macOS 64-bit`: For macOS users with Intel CPU.
+- `CPU, MPS macOS ARM64`: For macOS users with Apple Silicon CPU. MPS acceleration is available.
 - `CPU macOS 64-bit; MPS macOS Rosetta 2`: For macOS users (Both Intel Mac and Apple Silicon Mac). You may need to install Rosetta 2 on Apple Silicon Mac. MPS acceleration is available on Apple Silicon Mac.
 <!-- - `MPS macOS ARM64`: For macOS users with Apple Silicon CPU. -->
 
@@ -70,9 +72,9 @@ These presets are created for each stem.
 
 You can enable or disable a stem by clicking on the checkbox on the left of the stem name. If you've selected more than one cells and clicked on a checkbox whose row has been selected, all the selected cells will be enabled or disabled.
 
-Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer.
+Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer. The parameters of default presets can't be changed.
 
-You can also add your own stems by clicking "Add" button. Remember that do not enable a stem with the same name as an existing stem. The behavior of this is undefined.
+You can also add your own stems by clicking "Add" button. Remember that **do not enable a stem with the same name as an existing stem**. The behavior of this is undefined.
 
 ### Some "useless" functions of separation queue
 
