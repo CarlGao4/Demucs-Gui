@@ -1150,6 +1150,10 @@ class Mixer(QWidget):
         self.add_button.setText("Add")
         self.add_button.clicked.connect(self.addStem)
 
+        self.duplicate_button = QPushButton()
+        self.duplicate_button.setText("Duplicate")
+        self.duplicate_button.clicked.connect(self.duplicateSelected)
+
         self.slider = QSlider()
         self.slider.setOrientation(Qt.Orientation.Horizontal)
         self.slider.setRange(-500, 500)
@@ -1162,6 +1166,7 @@ class Mixer(QWidget):
         self.button_layout = QHBoxLayout()
         self.button_layout.addWidget(self.remove_button)
         self.button_layout.addWidget(self.add_button)
+        self.button_layout.addWidget(self.duplicate_button)
         self.widget_layout.addLayout(self.button_layout)
         self.widget_layout.addWidget(self.slider)
         self.setLayout(self.widget_layout)
@@ -1182,6 +1187,13 @@ class Mixer(QWidget):
     def addStem(self):
         self.outputs_table.addRow(["stem"] + ["0%\u3000" for _ in range(len(main_window.separator.sources) + 1)], True)
 
+    def duplicateSelected(self):
+        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())))
+        for i in indexes:
+            self.outputs_table.addRow((), True)
+            for j in range(self.outputs_table.columnCount()):
+                self.outputs_table.setItem(self.outputs_table.rowCount() - 1, j, self.outputs_table.item(i, j).clone())
+
     def resizeEvent(self, event=None) -> None:
         self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         required_width = self.outputs_table.columnWidth(0)
@@ -1197,7 +1209,7 @@ class Mixer(QWidget):
     def sliderValueChanged(self, value):
         if self.slider_value_changed_by_user:
             for i in self.outputs_table.selectedItems():
-                if i.column() != 1:
+                if i.column() != 1 and i.row() >= len(main_window.separator.sources) * 3:
                     i.setData(Qt.ItemDataRole.EditRole, str(value) + "%\u3000")
         else:
             self.slider_value_changed_by_user = True
