@@ -8,7 +8,7 @@
 
 1. Download the latest version of Demucs GUI from [GitHub Releases](https://github.com/CarlGao4/Demucs-Gui/releases) or [FossHUB](https://www.fosshub.com/Demucs-GUI.html). There are different download types:
 - `CUDA Windows 64-bit`: For Windows users with NVIDIA GPU (whose compute capability is greater than 3.5).
-- `CPU Windows 64-bit`: For Windows users without NVIDIA GPU.
+- `CPU Windows 64-bit`: For Windows users without accelerators (e.g. GPU).
 - `MKL Windows 64-bit`: For Windows users with Intel GPU (Intel Arc & Intel Xe). Not recommended to users who only have integrated Intel GPU.
 <!-- - `ROCm Windows 64-bit`: For Windows users with AMD GPU. -->
 - `CPU macOS 64-bit`: For macOS users with Intel CPU.
