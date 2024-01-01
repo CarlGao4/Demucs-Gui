@@ -50,6 +50,7 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
         global ipex
         ipex = False
         import intel_extension_for_pytorch as ipex  # type: ignore
+        logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
     except ModuleNotFoundError:
         logging.info("Intel Extension for PyTorch is not installed")
     except:
@@ -75,6 +76,10 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
             )
         elif ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
             update_status("Intel MKL backend is available")
+            logging.info(
+                "Intel MKL Info: "
+                + "    \n".join(str(torch.xpu.get_device_properties(i)) for i in range(torch.xpu.device_count()))
+            )
         else:
             update_status("No accelerator backend is available")
     time.sleep(1)
