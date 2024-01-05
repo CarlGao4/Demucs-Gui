@@ -1,5 +1,17 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.1a2*
+Release date: Jan. 1, 2024 (Happy New Year! :fireworks: :fireworks: :fireworks:)
+
+#### Updates
+1. Add mixer
+2. Add an option to restart the application quickly
+3. Support Intel GPU (MKL) accelerator
+4. Add native macOS ARM64 build
+
+#### Fixes
+1. Fix an error displaying queue length after removing items
+
 ### *1.1a1*
 Release date: Dec. 8, 2023
 
@@ -102,8 +114,8 @@ Release date: Jun. 22, 2022
 
 #### Updates
 1. Solved mono audio reading issue
-2. Now you can type in the numbers of splits and overlap. 
-3. Windows now can read ogg and mp3 files. 
+2. Now you can type in the numbers of splits and overlap.
+3. Windows now can read ogg and mp3 files.
 4. Increase log level
 
 #### Known issues
@@ -133,4 +145,4 @@ Release date: Mar. 31, 2022
 5. Provides recommended value for `split` based on your hardware
 
 #### Known issues
-1. Though the welcome page tells whether FFMpeg is installed, FFMpeg would not be used. 
+1. Though the welcome page tells whether FFMpeg is installed, FFMpeg would not be used.
