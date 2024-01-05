@@ -33,3 +33,4 @@ body:
   attributes:
     description: "Please paste your logs here. To find the logs, please click the menu in demucs-GUI window. You can remove some file paths inside the log, including model path and file path. You can attach the file here. "
     label: log
+    render: true
