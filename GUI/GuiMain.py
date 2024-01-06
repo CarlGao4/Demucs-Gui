@@ -1,4 +1,4 @@
-__version__ = "1.1a2"
+__version__ = "1.1b1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
@@ -255,6 +255,11 @@ class MainWindow(QMainWindow):
                 self.menu_about_log,
             ]
         )
+        if sys.platform == "win32" and (
+            (separator.has_Intel and sys.version_info[:2] == (3, 11)) or find_device_win.has_Intel
+        ):
+            self.menu_aot = Action("About AOT", self, self.ask_AOT)
+            self.menu_about.addAction(self.menu_aot)
         self.menubar.addAction(self.menu_about.menuAction())
         self.setMenuBar(self.menubar)
 
@@ -265,6 +270,13 @@ class MainWindow(QMainWindow):
     def showModelSelector(self):
         self.model_selector = ModelSelector()
         self.tab_widget.addTab(self.model_selector, self.model_selector.widget_title)
+        if (
+            sys.platform == "win32"
+            and sys.version_info[:2] == (3, 11)
+            and separator.has_Intel
+            and separator.Intel_JIT_only
+        ):
+            self.ask_AOT(open_from_menu=False)
 
     def showParamSettingsFunc(self):
         self.param_settings = SepParamSettings()
@@ -432,6 +444,77 @@ class MainWindow(QMainWindow):
             subprocess.Popen(sys.orig_argv)
             self.restarting = True
             self.close()
+
+    def ask_AOT(self, *, open_from_menu=True):
+        intel_gpus = []
+        for i in find_device_win.gpus:
+            if gpu_ver := find_device_win.is_intel_supported(i[1], i[2]):
+                intel_gpus.append((i[0], gpu_ver))
+        if not intel_gpus:
+            self.m.warning(self, "No supported Intel GPU found", "No supported Intel GPU found.")
+            return
+        if not open_from_menu:
+            prompt = "Detected Intel GPU support, but AOT is not enabled.\n\n"
+            warn = False
+        elif not separator.has_Intel:
+            prompt = "Warning: Intel GPU support disabled, though supported Intel GPU detected.\n\n"
+            warn = True
+        else:
+            prompt = ""
+            warn = False
+        if len(intel_gpus) == 1:
+            gpu_name, gpu_ver = intel_gpus[0]
+            m = QMessageBox(self)
+            m.setWindowTitle("About AOT")
+            prompt += "Found supported Intel GPU: %s (%s)\n" % (gpu_name, gpu_ver)
+            prompt += "Do you want to download the AOT version for this GPU or open AOT documentation?"
+            m.setText(prompt)
+            download_button = m.addButton("Download", m.ButtonRole.ActionRole)
+            doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
+            close_button = m.addButton(m.StandardButton.Close)
+            m.setDefaultButton(doc_button)
+            if warn:
+                m.setIcon(m.Icon.Warning)
+            else:
+                m.setIcon(m.Icon.Question)
+            while True:
+                m.exec()
+                if m.clickedButton() == download_button:
+                    webbrowser.open(find_device_win.get_download_link(gpu_ver))
+                elif m.clickedButton() == doc_button:
+                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/MKL-AOT.md")
+                else:
+                    break
+        else:
+            gpu_vers = set(i[1] for i in intel_gpus)
+            m = QMessageBox(self)
+            m.setWindowTitle("About AOT")
+            prompt += "Found %d supported Intel GPUs:\n" % len(intel_gpus)
+            for idx, i in enumerate(intel_gpus):
+                prompt += "%d. %s (%s)\n" % (idx + 1, i[0], i[1])
+            prompt += "\nDo you want to download the AOT version for one of these GPUs or open AOT documentation?"
+            m.setText(prompt)
+            download_buttons = []
+            for i in gpu_vers:
+                download_buttons.append((i, m.addButton("Download for %s" % i, m.ButtonRole.ActionRole)))
+            doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
+            close_button = m.addButton(m.StandardButton.Close)
+            m.setDefaultButton(doc_button)
+            if warn:
+                m.setIcon(m.Icon.Warning)
+            else:
+                m.setIcon(m.Icon.Question)
+            while True:
+                m.exec()
+                if m.clickedButton() == doc_button:
+                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/MKL-AOT.md")
+                elif m.clickedButton() == close_button:
+                    break
+                else:
+                    for i in download_buttons:
+                        if m.clickedButton() == i[1]:
+                            webbrowser.open(find_device_win.get_download_link(i[0]))
+                            break
 
 
 class ModelSelector(QWidget):
@@ -1422,6 +1505,9 @@ if __name__ == "__main__":
         "System free memory: %d (%s)" % (psutil.virtual_memory().free, shared.HSize(psutil.virtual_memory().free))
     )
     logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+
+    if sys.platform == "win32":
+        import find_device_win
 
     if shared.use_PyQt6:
         import PyQt6.QtCore

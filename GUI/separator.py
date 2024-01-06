@@ -17,6 +17,7 @@
 import hashlib
 import json
 import logging
+import os
 import pathlib
 import platform
 import psutil
@@ -36,6 +37,8 @@ import shared
 
 default_device = 0
 used_cuda = False
+has_Intel = False
+Intel_JIT_only = False
 
 downloaded_models = {}
 remote_urls = {}
@@ -43,18 +46,33 @@ remote_urls = {}
 
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
-    global torch, demucs, audio
+    global torch, demucs, audio, has_Intel, Intel_JIT_only
     import torch
 
-    try:
-        global ipex
-        ipex = False
-        import intel_extension_for_pytorch as ipex  # type: ignore
-        logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
-    except ModuleNotFoundError:
-        logging.info("Intel Extension for PyTorch is not installed")
-    except:
-        logging.error("Failed to load Intel Extension for PyTorch:\n" + traceback.format_exc())
+    for i in range(5):
+        try:
+            global ipex
+            ipex = False
+            import intel_extension_for_pytorch as ipex  # type: ignore
+
+            logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
+        except ModuleNotFoundError:
+            logging.info("Intel Extension for PyTorch is not installed")
+            break
+        except:
+            logging.error(
+                "Failed to load Intel Extension for PyTorch for the %d time:\n" % (i + 1) + traceback.format_exc()
+            )
+        else:
+            if torch.xpu.is_available():
+                has_Intel = True
+                if sys.platform == "win32":
+                    dll_size = os.path.getsize(ipex.dlls[0])
+                    logging.info("IPEX extension dll path: %s" % ipex.dlls[0])
+                    logging.info("IPEX extension dll size: %d" % dll_size)
+                    if dll_size < 1073741824:
+                        logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
+                        Intel_JIT_only = True
     import demucs.api
     import demucs.apply
     import audio
@@ -120,7 +138,7 @@ def getAvailableDevices():
                 devices.append((device_info_string, "xpu:%d" % i))
                 if device_property.total_memory > max_memory and device_property.total_memory > 2147480000:
                     max_memory = device_property.total_memory
-                    if hasattr(device_property, "support_fp64") and device_property.support_fp64:
+                    if hasattr(device_property, "gpu_eu_count") and device_property.gpu_eu_count >= 96:
                         default_device = len(devices) - 1
         elif torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0
