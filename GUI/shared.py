@@ -31,7 +31,7 @@ import urllib.request
 
 
 homeDir = pathlib.Path(__main__.__file__).resolve().parent
-debug = True
+debug = False  # Do not write log file, output to console instead if True
 use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
 if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
@@ -40,7 +40,9 @@ if sys.platform == "win32" and not debug and not sys.executable.endswith("python
     ctypes.windll.kernel32.FreeConsole()
 
 if not (homeDir.parent / ".git").exists():
-    os.chdir(homeDir)
+    os.chdir(homeDir)  # Change working directory to homeDir if not running from source
+else:
+    debug = True  # Disable log file if running from source
 
 save_loc_syntax = """You can use variables to rename your output file.
 Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
