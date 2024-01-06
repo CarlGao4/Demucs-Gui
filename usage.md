@@ -43,6 +43,8 @@ If the application cannot be launched due to the Mac's security protection featu
 
 6. Click `Start separate` to separate your file! Just keep the default parameters for now and it will be fine. If the separation failed, please refer to [Failed to separate an audio](#Failed-to-separate-an-audio).
 
+### [Notes for users using MKL release (Intel GPU)](MKL-AOT.md)
+
 ## Advanced Usage
 
 ### Load custom models

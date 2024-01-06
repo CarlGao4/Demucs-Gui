@@ -1,4 +1,4 @@
-__version__ = "1.0.2.1"
+__version__ = "1.1b1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
@@ -25,10 +25,12 @@ if not shared.use_PyQt6:
         QAbstractItemView,
         QApplication,
         QButtonGroup,
+        QCheckBox,
         QComboBox,
         QDialog,
         QDoubleSpinBox,
         QFileDialog,
+        QFrame,
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
@@ -49,21 +51,23 @@ if not shared.use_PyQt6:
         QStyleFactory,
         QTableWidget,
         QTableWidgetItem,
+        QTabWidget,
         QVBoxLayout,
         QWidget,
     )
 else:
     from PyQt6 import QtGui  # type: ignore
-    from PyQt6.QtCore import Qt, QTimer  # type: ignore
-    from PyQt6.QtCore import pyqtSignal as Signal  # type: ignore
+    from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QAbstractItemView,
         QApplication,
         QButtonGroup,
+        QCheckBox,
         QComboBox,
         QDialog,
         QDoubleSpinBox,
         QFileDialog,
+        QFrame,
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
@@ -84,19 +88,23 @@ else:
         QStyleFactory,
         QTableWidget,
         QTableWidgetItem,
+        QTabWidget,
         QVBoxLayout,
         QWidget,
     )
 
 import datetime
+import functools
 import logging
 import logging.handlers
 import os
+import packaging.version
 import pathlib
 import platform
 import psutil
 import random
 import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -104,7 +112,15 @@ import traceback
 import webbrowser
 
 import separator
-from PySide6_modified import Action, ModifiedQLabel, ProgressDelegate
+from PySide6_modified import (
+    Action,
+    DelegateCombiner,
+    ModifiedQLabel,
+    FileNameDelegate,
+    PercentSpinBoxDelegate,
+    ProgressDelegate,
+    QTableWidgetWithCheckBox,
+)
 
 file_queue_lock = threading.Lock()
 
@@ -115,7 +131,7 @@ class StartingWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
-        self.opacity = 0
+        self.opacity = 0.0
         self.setWindowOpacity(self.opacity)
         self.setWindowTitle("Demucs GUI %s" % __version__)
         self.timer = QTimer()
@@ -184,6 +200,13 @@ class MainWindow(QMainWindow):
     showParamSettings = Signal()
     setStatusText = Signal(str)
 
+    _execInMainThreadSignal = Signal()
+    _execInMainThreadFunc = None
+    _execInMainThreadResult = None
+    _execInMainThreadSuccess = False
+    _execInMainThreadLock = threading.Lock()
+    _execInMainThreadResultEvent = threading.Event()
+
     def __init__(self):
         super().__init__()
         self.setWindowIcon(QtGui.QIcon("./icon/icon.ico"))
@@ -191,10 +214,10 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
         self.timer = QTimer()
         self.widget = QWidget()
+        self.tab_widget = QTabWidget()
         self.setCentralWidget(self.widget)
         self.widget_layout = QVBoxLayout()
-        self.hlayout1 = QHBoxLayout()
-        self.widget_layout.addLayout(self.hlayout1)
+        self.widget_layout.addWidget(self.tab_widget)
         self.widget.setLayout(self.widget_layout)
         self.m = QMessageBox()
         self.showError.connect(self.showErrorFunc)
@@ -202,6 +225,7 @@ class MainWindow(QMainWindow):
         self.showWarning.connect(self.showWarningFunc)
         self.showParamSettings.connect(self.showParamSettingsFunc)
         self.setStatusText.connect(self.setStatusTextFunc)
+        self._execInMainThreadSignal.connect(self._exec_in_main_thread_executor)
         self.timer.singleShot(50, self.showModelSelector)
 
         self.menubar = QMenuBar()
@@ -213,26 +237,66 @@ class MainWindow(QMainWindow):
         self.menu_about_usage = Action(
             "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
         )
+        self.menu_clear_history = Action("Clear history", self, self.clear_history)
+        self.menu_check_update = Action(
+            "Check for update",
+            self,
+            lambda: shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x, show=True))),
+        )
+        self.menu_restart = Action("Restart", self, self.restart)
         self.menu_about_log = Action("Open log", self, self.open_log)
-        self.menu_about.addActions([self.menu_about_about, self.menu_about_usage, self.menu_about_log])
+        self.menu_about.addActions(
+            [
+                self.menu_about_about,
+                self.menu_about_usage,
+                self.menu_clear_history,
+                self.menu_check_update,
+                self.menu_restart,
+                self.menu_about_log,
+            ]
+        )
+        if sys.platform == "win32" and (
+            (separator.has_Intel and sys.version_info[:2] == (3, 11)) or find_device_win.has_Intel
+        ):
+            self.menu_aot = Action("About AOT", self, self.ask_AOT)
+            self.menu_about.addAction(self.menu_aot)
         self.menubar.addAction(self.menu_about.menuAction())
         self.setMenuBar(self.menubar)
 
+        self.restarting = False
+
+        shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x)))
+
     def showModelSelector(self):
         self.model_selector = ModelSelector()
-        self.hlayout1.addWidget(self.model_selector, 16)
+        self.tab_widget.addTab(self.model_selector, self.model_selector.widget_title)
+        if (
+            sys.platform == "win32"
+            and sys.version_info[:2] == (3, 11)
+            and separator.has_Intel
+            and separator.Intel_JIT_only
+        ):
+            self.ask_AOT(open_from_menu=False)
 
     def showParamSettingsFunc(self):
-        self.vlayout1 = QVBoxLayout()
         self.param_settings = SepParamSettings()
         self.save_options = SaveOptions()
+        self.options_tab = QWidget()
+        self.options_tab.setLayout(QVBoxLayout())
+        self.options_tab.layout().addWidget(self.param_settings)
+        self.options_tab.layout().addWidget(self.save_options)
+        self.mixer = Mixer()
         self.file_queue = FileQueue()
         self.separation_control = SeparationControl()
-        self.vlayout1.addWidget(self.param_settings)
-        self.vlayout1.addWidget(self.save_options)
-        self.hlayout1.addLayout(self.vlayout1, 48)
-        self.hlayout1.addWidget(self.file_queue, 64)
+        self.tab_widget.addTab(self.options_tab, "Options")
+        self.tab_widget.addTab(self.mixer, self.mixer.widget_title)
+        self.tab_widget.addTab(self.file_queue, self.file_queue.widget_title % self.file_queue.queue_length)
         self.widget_layout.addWidget(self.separation_control)
+
+    def updateQueueLength(self):
+        self.tab_widget.setTabText(
+            self.tab_widget.indexOf(self.file_queue), self.file_queue.widget_title % self.file_queue.queue_length
+        )
 
     def loadModel(self, model, repo):
         try:
@@ -247,7 +311,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if (
-            (not hasattr(self, "separator"))
+            self.restarting
+            or (not hasattr(self, "separator"))
             or (not (self.separator.separating or self.save_options.saving))
             or (
                 self.m.question(
@@ -280,7 +345,7 @@ class MainWindow(QMainWindow):
         if sys.platform == "win32":
             os.startfile(str(shared.logfile.resolve()))
         elif sys.platform == "darwin":
-            os.system(shlex.join(["open", str(shared.logfile.resolve()), "&"]))
+            os.system(shlex.join(["open", str(shared.logfile.resolve())]))
         else:
             try:
                 os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
@@ -297,11 +362,166 @@ class MainWindow(QMainWindow):
                 ):
                     QApplication.clipboard().setText(str(shared.logfile))
 
+    def exec_in_main(self, func):
+        with self._execInMainThreadLock:
+            self._execInMainThreadFunc = func
+            self._execInMainThreadResultEvent.clear()
+            self._execInMainThreadSignal.emit()
+            self._execInMainThreadResultEvent.wait()
+            if self._execInMainThreadSuccess:
+                ret = self._execInMainThreadResult
+                self._execInMainThreadResult = None
+                self._execInMainThreadFunc = None
+                return ret
+            else:
+                err = self._execInMainThreadResult
+                self._execInMainThreadResult = None
+                self._execInMainThreadFunc = None
+                raise err
 
-class ModelSelector(QGroupBox):
+    def _exec_in_main_thread_executor(self):
+        try:
+            self._execInMainThreadResult = self._execInMainThreadFunc()
+            self._execInMainThreadSuccess = True
+        except Exception as e:
+            self._execInMainThreadResult = e
+            self._execInMainThreadSuccess = False
+        self._execInMainThreadResultEvent.set()
+
+    def validateUpdate(self, new_version, show=False):
+        if new_version is None:
+            if show:
+                self.m.warning(
+                    self, "Check for update failed", "Failed to check for update. Check log file for details."
+                )
+            return
+        version_new = packaging.version.Version(new_version)
+        if version_new <= packaging.version.Version(__version__):
+            if show:
+                self.m.information(self, "No update available", "You are using the latest version.")
+            return
+        if (
+            self.m.question(
+                self,
+                "Update available",
+                "A new version (%s) of Demucs GUI is available. Do you want to visit GitHub to download it?%s"
+                % (new_version, "\nWarning: this is a pre-release version." if version_new.is_prerelease else ""),
+                self.m.StandardButton.Yes,
+                self.m.StandardButton.No,
+            )
+            == self.m.StandardButton.Yes
+        ):
+            webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/releases")
+
+    def clear_history(self):
+        if (
+            self.m.question(
+                self,
+                "Clear history",
+                "Are you sure you want to clear the history? This action cannot be undone.",
+                self.m.StandardButton.Yes,
+                self.m.StandardButton.No,
+            )
+            == self.m.StandardButton.Yes
+        ):
+            shared.ResetHistory()
+
+    def restart(self):
+        if (
+            (not hasattr(self, "separator"))
+            or (not (self.separator.separating or self.save_options.saving))
+            or (
+                self.m.question(
+                    self,
+                    "Separation in progress",
+                    "Separation is not finished, restart anyway?",
+                    self.m.StandardButton.Yes,
+                    self.m.StandardButton.Cancel,
+                )
+                == self.m.StandardButton.Yes
+            )
+        ):
+            subprocess.Popen(sys.orig_argv)
+            self.restarting = True
+            self.close()
+
+    def ask_AOT(self, *, open_from_menu=True):
+        intel_gpus = []
+        for i in find_device_win.gpus:
+            if gpu_ver := find_device_win.is_intel_supported(i[1], i[2]):
+                intel_gpus.append((i[0], gpu_ver))
+        if not intel_gpus:
+            self.m.warning(self, "No supported Intel GPU found", "No supported Intel GPU found.")
+            return
+        if not open_from_menu:
+            prompt = "Detected Intel GPU support, but AOT is not enabled.\n\n"
+            warn = False
+        elif not separator.has_Intel:
+            prompt = "Warning: Intel GPU support disabled, though supported Intel GPU detected.\n\n"
+            warn = True
+        else:
+            prompt = ""
+            warn = False
+        if len(intel_gpus) == 1:
+            gpu_name, gpu_ver = intel_gpus[0]
+            m = QMessageBox(self)
+            m.setWindowTitle("About AOT")
+            prompt += "Found supported Intel GPU: %s (%s)\n" % (gpu_name, gpu_ver)
+            prompt += "Do you want to download the AOT version for this GPU or open AOT documentation?"
+            m.setText(prompt)
+            download_button = m.addButton("Download", m.ButtonRole.ActionRole)
+            doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
+            close_button = m.addButton(m.StandardButton.Close)
+            m.setDefaultButton(doc_button)
+            if warn:
+                m.setIcon(m.Icon.Warning)
+            else:
+                m.setIcon(m.Icon.Question)
+            while True:
+                m.exec()
+                if m.clickedButton() == download_button:
+                    webbrowser.open(find_device_win.get_download_link(gpu_ver))
+                elif m.clickedButton() == doc_button:
+                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/MKL-AOT.md")
+                else:
+                    break
+        else:
+            gpu_vers = set(i[1] for i in intel_gpus)
+            m = QMessageBox(self)
+            m.setWindowTitle("About AOT")
+            prompt += "Found %d supported Intel GPUs:\n" % len(intel_gpus)
+            for idx, i in enumerate(intel_gpus):
+                prompt += "%d. %s (%s)\n" % (idx + 1, i[0], i[1])
+            prompt += "\nDo you want to download the AOT version for one of these GPUs or open AOT documentation?"
+            m.setText(prompt)
+            download_buttons = []
+            for i in gpu_vers:
+                download_buttons.append((i, m.addButton("Download for %s" % i, m.ButtonRole.ActionRole)))
+            doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
+            close_button = m.addButton(m.StandardButton.Close)
+            m.setDefaultButton(doc_button)
+            if warn:
+                m.setIcon(m.Icon.Warning)
+            else:
+                m.setIcon(m.Icon.Question)
+            while True:
+                m.exec()
+                if m.clickedButton() == doc_button:
+                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/MKL-AOT.md")
+                elif m.clickedButton() == close_button:
+                    break
+                else:
+                    for i in download_buttons:
+                        if m.clickedButton() == i[1]:
+                            webbrowser.open(find_device_win.get_download_link(i[0]))
+                            break
+
+
+class ModelSelector(QWidget):
+    widget_title = "Select model"
+
     def __init__(self):
         super().__init__()
-        self.setTitle("Select model")
 
         self.advanced_settings = AdvancedModelSettings(self.refreshModels)
 
@@ -310,14 +530,14 @@ class ModelSelector(QGroupBox):
         self.select_label.setFixedWidth(80)
 
         self.select_combobox = QComboBox()
-        self.select_combobox.setFixedWidth(240)
+        self.select_combobox.setMinimumWidth(240)
         self.select_combobox.currentIndexChanged.connect(self.updateModelInfo)
 
         self.model_info = ModifiedQLabel()
         self.model_info.setMinimumHeight(160)
         self.model_info.setWordWrap(True)
         self.model_info.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.model_info.setFixedWidth(400)
+        self.model_info.setMinimumWidth(300)
 
         self.refresh_button = QPushButton()
         self.refresh_button.setText("Refresh")
@@ -360,11 +580,11 @@ class ModelSelector(QGroupBox):
     def loadModel(self):
         global main_window
 
-        self.setEnabled(False)
-        self.advanced_settings.setEnabled(False)
+        main_window.exec_in_main(lambda: self.setEnabled(False))
+        main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(False))
 
-        model_name = self.models[self.select_combobox.currentIndex()]
-        model_repo = self.repos[self.select_combobox.currentIndex()]
+        model_name = self.models[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
+        model_repo = self.repos[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
         logging.info(
             "Loading model %s from repo %s" % (model_name, model_repo if model_repo is not None else '"remote"')
         )
@@ -378,13 +598,13 @@ class ModelSelector(QGroupBox):
             main_window.showError.emit(
                 "Load model failed", "Failed to load model. Check log file for more information."
             )
-            self.setEnabled(True)
-            self.advanced_settings.setEnabled(True)
+            main_window.exec_in_main(lambda: self.setEnabled(True))
+            main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(True))
             return
 
         model_info = main_window.separator.modelInfo()
-        main_window.model_selector.model_info.setText(model_info)
-        self.model_info.setMinimumHeight(self.model_info.heightForWidth(400))
+        main_window.exec_in_main(lambda: main_window.model_selector.model_info.setText(model_info))
+        main_window.exec_in_main(lambda: self.model_info.setMinimumHeight(self.model_info.heightForWidth(400)))
         main_window.setStatusText.emit("Model loaded within %.4fs" % (end_time - start_time))
         main_window.showParamSettings.emit()
         logging.info("Model loaded within %.4fs" % (end_time - start_time))
@@ -544,6 +764,12 @@ class SepParamSettings(QGroupBox):
         self.default_button.setText("Restore defaults")
         self.default_button.clicked.connect(self.restoreDefaults)
 
+        self.separate_once_added = QCheckBox()
+        self.separate_once_added.setText("Separate once added")
+        self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
+        self.separate_once_added.setChecked(shared.GetHistory("separate_once_added", False))
+        self.separate_once_added.stateChanged.connect(functools.partial(shared.SetHistory, "separate_once_added"))
+
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.device_label, 0, 0)
         self.widget_layout.addWidget(self.device_selector, 0, 1, 1, 2)
@@ -556,7 +782,8 @@ class SepParamSettings(QGroupBox):
         self.widget_layout.addWidget(self.shifts_label, 3, 0)
         self.widget_layout.addWidget(self.shifts_spinbox, 3, 1)
         self.widget_layout.addWidget(self.shifts_slider, 3, 2)
-        self.widget_layout.addWidget(self.default_button, 4, 0, 1, 3)
+        self.widget_layout.addWidget(self.separate_once_added, 4, 0, 1, 3)
+        self.widget_layout.addWidget(self.default_button, 5, 0, 1, 3)
 
         self.setLayout(self.widget_layout)
 
@@ -592,9 +819,17 @@ class SaveOptions(QGroupBox):
         self.loc_absolute_path_button.setText("Absolute path")
         self.location_group.addButton(self.loc_relative_path_button, 0)
         self.location_group.addButton(self.loc_absolute_path_button, 1)
-        self.loc_relative_path_button.setChecked(True)
-        self.loc_input = QLineEdit()
-        self.loc_input.setText("separated/{model}/{track}/{stem}.{ext}")
+        self.location_group.idClicked.connect(functools.partial(shared.SetHistory, "save_location_type"))
+        if shared.GetHistory("save_location_type", 0) == 0:
+            self.loc_relative_path_button.setChecked(True)
+        else:
+            self.loc_absolute_path_button.setChecked(True)
+        self.loc_input = QComboBox()
+        self.loc_input.setEditable(True)
+        self.loc_input.addItems(
+            list(shared.GetHistory("save_location", "separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True))
+        )
+        self.loc_input.setCurrentIndex(0)
         self.browse_button = QPushButton()
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.browseLocation)
@@ -606,14 +841,16 @@ class SaveOptions(QGroupBox):
 
         self.clip_mode = QComboBox()
         self.clip_mode.addItems(["rescale", "clamp", "none"])
-        self.clip_mode.setCurrentIndex(0)
+        self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", "rescale"))
+        self.clip_mode.currentTextChanged.connect(functools.partial(shared.SetHistory, "clip_mode"))
 
         self.file_format_label = QLabel()
         self.file_format_label.setText("File format:")
 
         self.file_format = QComboBox()
         self.file_format.addItems(["wav", "flac"])
-        self.file_format.setCurrentIndex(1)
+        self.file_format.setCurrentText(shared.GetHistory("file_format", "flac"))
+        self.file_format.currentTextChanged.connect(functools.partial(shared.SetHistory, "file_format"))
 
         self.sample_fmt_label = QLabel()
         self.sample_fmt_label.setText("Sample format:")
@@ -622,15 +859,21 @@ class SaveOptions(QGroupBox):
         self.sample_fmt.addItem("int16", "PCM_16")
         self.sample_fmt.addItem("int24", "PCM_24")
         self.sample_fmt.addItem("float32", "FLOAT")
-        self.sample_fmt.setCurrentIndex(0)
+        self.sample_fmt.setCurrentText(shared.GetHistory("sample_fmt", "int16"))
+        self.sample_fmt.currentTextChanged.connect(functools.partial(shared.SetHistory, "sample_fmt"))
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
 
         self.widget_layout = QGridLayout()
-        self.widget_layout.addWidget(self.location_label, 0, 0, 1, 2)
+        self.widget_layout.addWidget(self.location_label, 0, 0, 1, 1)
         self.widget_layout.addWidget(self.location_help, 0, 2)
-        self.widget_layout.addWidget(self.loc_relative_path_button, 1, 1)
-        self.widget_layout.addWidget(self.loc_absolute_path_button, 1, 2)
-        self.widget_layout.addWidget(self.loc_input, 2, 1, 1, 2)
-        self.widget_layout.addWidget(self.browse_button, 3, 1, 1, 2)
+        self.widget_layout.addWidget(self.loc_relative_path_button, 1, 0)
+        self.widget_layout.addWidget(self.loc_absolute_path_button, 1, 1)
+        self.widget_layout.addWidget(self.browse_button, 1, 2)
+        self.widget_layout.addWidget(self.loc_input, 2, 0, 1, 3)
+        self.widget_layout.addWidget(line, 3, 0, 1, 3)
         self.widget_layout.addWidget(self.clip_mode_label, 4, 0, 1, 2)
         self.widget_layout.addWidget(self.clip_mode, 4, 2)
         self.widget_layout.addWidget(self.file_format_label, 5, 0, 1, 2)
@@ -645,14 +888,14 @@ class SaveOptions(QGroupBox):
     def browseLocation(self):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
-            self.loc_input.setText(p)
+            self.loc_input.setCurrentText(p)
 
     @shared.thread_wrapper(daemon=True)
-    def save(self, file, tensor, save_func, item, finishCallback):
+    def save(self, file, origin, tensor, save_func, item, finishCallback):
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
-        for stem, stem_data in tensor.items():
-            file_path_str = self.loc_input.text().format(
+        for stem, stem_data in main_window.mixer.mix(origin, tensor):
+            file_path_str = self.loc_input.currentText().format(
                 track=file.stem,
                 trackext=file.name,
                 stem=stem,
@@ -678,12 +921,13 @@ class SaveOptions(QGroupBox):
         finishCallback(shared.FileStatus.Finished, item)
 
 
-class FileQueue(QGroupBox):
+class FileQueue(QWidget):
+    widget_title = "File queue (%d)"
+
     def __init__(self):
         global main_window
 
         super().__init__()
-        self.setTitle("Queue")
 
         self.table = QTableWidget()
         self.table.setColumnCount(2)
@@ -741,7 +985,7 @@ class FileQueue(QGroupBox):
         self.pause_button.clicked.connect(self.pause)
 
         self.resume_button = QPushButton()
-        self.resume_button.setText("Resume")
+        self.resume_button.setText("Resume / Retry")
         self.resume_button.clicked.connect(self.resume)
 
         self.move_top_button = QPushButton()
@@ -762,6 +1006,8 @@ class FileQueue(QGroupBox):
         self.repaint_timer = QTimer()
         self.repaint_timer.timeout.connect(self.paint_table_progress)
         self.toggleAnimation(True)
+
+        self.queue_length = 0
 
     def table_dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -815,6 +1061,10 @@ class FileQueue(QGroupBox):
                     self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
                     self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
                     self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
+                    self.queue_length += 1
+                if main_window.param_settings.separate_once_added.isChecked():
+                    main_window.separation_control.start_button.click()
+                main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
         if index == 0:
@@ -854,6 +1104,12 @@ class FileQueue(QGroupBox):
                 shared.FileStatus.Failed,
             ]:
                 continue
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+                shared.FileStatus.Queued,
+                shared.FileStatus.Paused,
+            ]:
+                self.queue_length -= 1
+                main_window.updateQueueLength()
             self.table.removeRow(i)
 
     def pause(self):
@@ -869,6 +1125,7 @@ class FileQueue(QGroupBox):
             if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
                 shared.FileStatus.Paused,
                 shared.FileStatus.Cancelled,
+                shared.FileStatus.Failed,
             ]:
                 self.table.item(i, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
                 self.table.item(i, 1).setData(ProgressDelegate.TextRole, "Queued")
@@ -897,7 +1154,167 @@ class FileQueue(QGroupBox):
             return None
 
 
-class SeparationControl(QGroupBox):
+class DelegateCallback(DelegateCombiner):
+    def __init__(self, mixer: "Mixer", parent=None):
+        super().__init__(parent)
+        self._mixer = mixer
+
+    def createEditor(self, parent, option, index):
+        self._mixer.slider.setEnabled(False)
+        return super().createEditor(parent, option, index)
+
+    def destroyEditor(self, editor, index):
+        ret = super().destroyEditor(editor, index)
+        if super().editors == 0:
+            self._mixer.slider.setEnabled(True)
+        self._mixer.selectedItemChanged(*(self._mixer.outputs_table.currentItem(),) * 2)
+        return ret
+
+
+class Mixer(QWidget):
+    widget_title = "Mixer"
+
+    def __init__(self):
+        super().__init__()
+
+        self.outputs_table = QTableWidgetWithCheckBox()
+        self.outputs_table.setColumnCount(len(main_window.separator.sources) + 2)
+        self.outputs_table.setHorizontalHeaderLabels(["Stem name", "origin"] + list(main_window.separator.sources))
+
+        self.outputs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.outputs_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.outputs_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        self.outputs_table.setAlternatingRowColors(True)
+        self.outputs_table.setVerticalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.outputs_table.setHorizontalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.outputs_table.currentItemChanged.connect(self.selectedItemChanged)
+
+        self.delegate = DelegateCallback(self)
+        self.delegate.addDelegate(FileNameDelegate(), lambda x: x.column() == 1)
+        self.delegate.addDelegate(PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1), lambda x: x.column() > 1)
+        self.outputs_table.setItemDelegate(self.delegate)
+
+        # Single stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                [stem]
+                + ["100%\u3000" if idx + 1 == j else "0%\u3000" for j in range(len(main_window.separator.sources) + 1)],
+                True,
+            )
+
+        # Minus stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                ["minus_" + stem]
+                + [
+                    "100%\u3000" if j == 0 else "-100%\u3000" if idx + 1 == j else "0%\u3000"
+                    for j in range(len(main_window.separator.sources) + 1)
+                ],
+                False,
+            )
+
+        # Mixed stems
+        for idx, stem in enumerate(main_window.separator.sources):
+            self.outputs_table.addRow(
+                ["no_" + stem]
+                + [
+                    "0%\u3000" if j == 0 or idx + 1 == j else "100%\u3000"
+                    for j in range(len(main_window.separator.sources) + 1)
+                ],
+                False,
+            )
+
+        self.remove_button = QPushButton()
+        self.remove_button.setText("Remove")
+        self.remove_button.clicked.connect(self.removeSelected)
+
+        self.add_button = QPushButton()
+        self.add_button.setText("Add")
+        self.add_button.clicked.connect(self.addStem)
+
+        self.duplicate_button = QPushButton()
+        self.duplicate_button.setText("Duplicate")
+        self.duplicate_button.clicked.connect(self.duplicateSelected)
+
+        self.slider = QSlider()
+        self.slider.setOrientation(Qt.Orientation.Horizontal)
+        self.slider.setRange(-500, 500)
+
+        self.slider_value_changed_by_user = True
+        self.slider.valueChanged.connect(self.sliderValueChanged)
+
+        self.widget_layout = QVBoxLayout()
+        self.widget_layout.addWidget(self.outputs_table)
+        self.button_layout = QHBoxLayout()
+        self.button_layout.addWidget(self.remove_button)
+        self.button_layout.addWidget(self.add_button)
+        self.button_layout.addWidget(self.duplicate_button)
+        self.widget_layout.addLayout(self.button_layout)
+        self.widget_layout.addWidget(self.slider)
+        self.setLayout(self.widget_layout)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
+            self.removeSelected()
+
+    def removeSelected(self):
+        if max(i.row() for i in self.outputs_table.selectedIndexes()) < len(main_window.separator.sources) * 3:
+            main_window.showError.emit("Cannot remove default stems", "Cannot remove default stems")
+        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
+        for i in indexes:
+            if i < len(main_window.separator.sources) * 3:
+                break
+            self.outputs_table.removeRow(i)
+
+    def addStem(self):
+        self.outputs_table.addRow(["stem"] + ["0%\u3000" for _ in range(len(main_window.separator.sources) + 1)], True)
+
+    def duplicateSelected(self):
+        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())))
+        for i in indexes:
+            self.outputs_table.addRow((), True)
+            for j in range(self.outputs_table.columnCount()):
+                self.outputs_table.setItem(self.outputs_table.rowCount() - 1, j, self.outputs_table.item(i, j).clone())
+
+    def resizeEvent(self, event=None) -> None:
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        required_width = self.outputs_table.columnWidth(0)
+        self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        if required_width > self.outputs_table.columnWidth(0):
+            self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+
+    def selectedItemChanged(self, current, previous):
+        if current is not None and current.column() != 1:
+            self.slider_value_changed_by_user = False
+            self.slider.setValue(int(current.data(Qt.ItemDataRole.EditRole)[:-2]))
+
+    def sliderValueChanged(self, value):
+        if self.slider_value_changed_by_user:
+            for i in self.outputs_table.selectedItems():
+                if i.column() != 1 and i.row() >= len(main_window.separator.sources) * 3:
+                    i.setData(Qt.ItemDataRole.EditRole, str(value) + "%\u3000")
+        else:
+            self.slider_value_changed_by_user = True
+
+    def mix(self, origin: "separator.torch.Tensor", separated: "dict[str, separator.torch.Tensor]"):
+        for i in range(self.outputs_table.rowCount()):
+            if self.outputs_table.getCheckState(i):
+                stem = self.outputs_table.item(i, 0).text()
+                logging.info("Mixing stem %s" % stem)
+                out = origin.clone()
+                out *= float(self.outputs_table.item(i, 1).data(Qt.ItemDataRole.EditRole)[:-2]) / 100
+                for j in range(self.outputs_table.columnCount() - 2):
+                    source = self.outputs_table.horizontalHeaderItem(j + 2).text()
+                    out += (
+                        separated[source]
+                        * float(self.outputs_table.item(i, j + 2).data(Qt.ItemDataRole.EditRole)[:-2])
+                        / 100
+                    )
+                yield stem, out
+
+
+class SeparationControl(QWidget):
     startSeparateSignal = Signal()
     currentFinishedSignal = Signal(int, QTableWidgetItem)
     setModelProgressSignal = Signal(float)
@@ -926,10 +1343,12 @@ class SeparationControl(QGroupBox):
         self.current_model_progressbar = QProgressBar()
         self.current_model_progressbar.setMaximum(65536)
         self.current_model_progressbar.setValue(0)
+        self.current_model_progressbar.setMinimumWidth(400)
 
         self.current_audio_progressbar = QProgressBar()
         self.current_audio_progressbar.setMaximum(65536)
         self.current_audio_progressbar.setValue(0)
+        self.current_audio_progressbar.setMinimumWidth(400)
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.start_button, 0, 0)
@@ -995,13 +1414,18 @@ class SeparationControl(QGroupBox):
             item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
         if self.stop_now:
             self.stop_now = False
+        if status not in [shared.FileStatus.Writing]:
+            main_window.file_queue.queue_length -= 1
+            main_window.updateQueueLength()
         if status != shared.FileStatus.Finished:
             self.start_button.setEnabled(True)
             self.startSeparateSignal.emit()
 
     def startSeparation(self):
         global main_window
-        if "{stem}" not in main_window.save_options.loc_input.text():
+        if not self.start_button.isEnabled():
+            return
+        if "{stem}" not in main_window.save_options.loc_input.currentText():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         self.start_button.setEnabled(False)
         if (index := main_window.file_queue.getFirstQueued()) is None:
@@ -1081,6 +1505,22 @@ if __name__ == "__main__":
         "System free memory: %d (%s)" % (psutil.virtual_memory().free, shared.HSize(psutil.virtual_memory().free))
     )
     logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+
+    if sys.platform == "win32":
+        import find_device_win
+
+    if shared.use_PyQt6:
+        import PyQt6.QtCore
+
+        logging.info("Using PyQt6")
+        logging.info("Qt version: %s" % PyQt6.QtCore.QT_VERSION_STR)
+        logging.info("PyQt6 version: %s" % PyQt6.QtCore.PYQT_VERSION_STR)
+    else:
+        import PySide6.QtCore
+
+        logging.info("Using PySide6")
+        logging.info("Qt version: %s" % PySide6.QtCore.qVersion())
+        logging.info("PySide6 version: %s" % PySide6.__version__)
 
     app = QApplication([])
     starting_window = StartingWindow()

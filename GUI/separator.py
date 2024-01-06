@@ -14,14 +14,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import hashlib
+import json
 import logging
+import os
 import pathlib
 import platform
 import psutil
+import shutil
 import sys
 import time
 import traceback
 import typing as tp
+import urllib.parse
+import urllib.request
 import yaml
 
 from fractions import Fraction
@@ -31,12 +37,42 @@ import shared
 
 default_device = 0
 used_cuda = False
+has_Intel = False
+Intel_JIT_only = False
+
+downloaded_models = {}
+remote_urls = {}
 
 
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
-    global torch, demucs, audio
+    global torch, demucs, audio, has_Intel, Intel_JIT_only
     import torch
+
+    for i in range(5):
+        try:
+            global ipex
+            ipex = False
+            import intel_extension_for_pytorch as ipex  # type: ignore
+
+            logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
+        except ModuleNotFoundError:
+            logging.info("Intel Extension for PyTorch is not installed")
+            break
+        except:
+            logging.error(
+                "Failed to load Intel Extension for PyTorch for the %d time:\n" % (i + 1) + traceback.format_exc()
+            )
+        else:
+            if torch.xpu.is_available():
+                has_Intel = True
+                if sys.platform == "win32":
+                    dll_size = os.path.getsize(ipex.dlls[0])
+                    logging.info("IPEX extension dll path: %s" % ipex.dlls[0])
+                    logging.info("IPEX extension dll size: %d" % dll_size)
+                    if dll_size < 1073741824:
+                        logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
+                        Intel_JIT_only = True
     import demucs.api
     import demucs.apply
     import audio
@@ -56,8 +92,14 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
                 "CUDA Info: "
                 + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
             )
+        elif ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
+            update_status("Intel MKL backend is available")
+            logging.info(
+                "Intel MKL Info: "
+                + "    \n".join(str(torch.xpu.get_device_properties(i)) for i in range(torch.xpu.device_count()))
+            )
         else:
-            update_status("CUDA backend is not available")
+            update_status("No accelerator backend is available")
     time.sleep(1)
     ffmpeg_version = audio.checkFFMpeg()
     if not ffmpeg_version:
@@ -80,7 +122,25 @@ def getAvailableDevices():
         else:
             logging.info("MPS backend is not available")
     else:
-        if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
+            max_memory = 0
+            for i in range(torch.xpu.device_count()):
+                device_property = torch.xpu.get_device_properties(i)
+                device_info_string = ""
+                if hasattr(device_property, "dev_type") and isinstance(device_property.dev_type, str):
+                    device_info_string += device_property.dev_type.upper() + " - "
+                device_info_string += device_property.name
+                if hasattr(device_property, "platform_name") and isinstance(device_property.platform_name, str):
+                    device_info_string += " (" + device_property.platform_name + ", "
+                else:
+                    device_info_string += " ("
+                device_info_string += "%d MiB)" % (device_property.total_memory / 1048576)
+                devices.append((device_info_string, "xpu:%d" % i))
+                if device_property.total_memory > max_memory and device_property.total_memory > 2147480000:
+                    max_memory = device_property.total_memory
+                    if hasattr(device_property, "gpu_eu_count") and device_property.gpu_eu_count >= 96:
+                        default_device = len(devices) - 1
+        elif torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0
             for i in range(torch.cuda.device_count()):
                 device_property = torch.cuda.get_device_properties(i)
@@ -92,17 +152,24 @@ def getAvailableDevices():
                 )
                 if device_property.total_memory > max_memory and device_property.total_memory > 2147480000:
                     max_memory = device_property.total_memory
-                    default_device = i + 1
+                    default_device = len(devices) - 1
     return devices
 
 
 def autoListModels():
+    global downloaded_models, remote_urls
     bags = []
     singles = []
     custom_repo = shared.GetSetting("custom_repo", [])
     repos = [shared.homeDir / "pretrained", shared.pretrained]
     repos += [pathlib.Path(i) for i in custom_repo]
     repos += [None]
+    try:
+        torch.hub.set_dir(shared.model_cache)
+        checkpoint_dir = shared.model_cache / "checkpoints"
+        downloaded_models = demucs.api.list_models(checkpoint_dir)["single"]
+    except:
+        logging.error("Failed to list downloaded models:\n%s" % traceback.format_exc())
     for repopath in repos:
         if repopath is not None and not repopath.exists():
             continue
@@ -122,24 +189,37 @@ def autoListModels():
             info += "\nFile: " + str(filepath)
             try:
                 with open(filepath, "rt", encoding="utf8") as f:
-                    model_def = yaml.safe_load(f)
-                if weights := model_def.get("weights"):
-                    info += "\nModels and weights:"
+                    model_def = yaml.load(f, yaml.Loader)
+                info += "\nModels:"
+                if "weights" in model_def:
+                    weights = model_def["weights"]
                     for i, (model, weight) in enumerate(zip(model_def["models"], weights)):
                         info += "\n\u3000%d. %s: %s" % (i + 1, model, weight)
+                        if repopath is None:
+                            info += " (Downloaded)" if model in downloaded_models else " (Not downloaded)"
                 else:
-                    info += "\nModels: " + ", ".join(model_def["models"])
-                if segment := model_def.get("segment"):
-                    info += "\nDefault segment: %.1f" % segment
+                    for i, model in enumerate(model_def["models"]):
+                        info += "\n\u3000%d. %s" % (i + 1, model)
+                        if repopath is None:
+                            info += " (Downloaded)" if model in downloaded_models else " (Not downloaded)"
+                if "segment" in model_def:
+                    info += "\nDefault segment: %.1f" % model_def["segment"]
             except:
                 logging.error("Failed to load info of model %s:\n%s" % (sig, traceback.format_exc()))
-            bags.append((sig, info, repopath))
+            else:
+                remote_urls[sig] = model_def["models"]
+                bags.append((sig, info, repopath))
         for sig, filepath in new_models["single"].items():
             info = "Model signature: " + sig
             info += "\nType: Single model"
             if repopath is None:
                 info += "\nPosition: Remote model"
                 info += "\nURL: " + str(filepath)
+                info += "\nState: " + ("Downloaded" if sig in downloaded_models else "Not downloaded")
+                if sig in downloaded_models:
+                    info += "\nFile: " + str(downloaded_models[sig])
+                else:
+                    remote_urls[sig] = str(filepath)
             else:
                 info += "\nPosition: Local model"
                 info += "\nRepo: " + str(repopath)
@@ -162,13 +242,15 @@ class Separator:
         repo: tp.Optional[pathlib.Path] = None,
         updateStatus: tp.Optional[tp.Callable[[str], None]] = None,
     ):
-        self.separator = demucs.api.Separator(model=model, repo=repo, progress=False)
-        self.model = model
-        self.repo = repo
         if callable(updateStatus):
             self.updateStatus = updateStatus
         else:
             self.updateStatus = lambda *_: None
+        if repo is None:
+            self.ensureDownloaded(model)
+        self.separator = demucs.api.Separator(model=model, repo=repo, progress=False)
+        self.model = model
+        self.repo = repo
         if not isinstance(self.separator.model, demucs.apply.BagOfModels):
             self.default_segment = self.separator.model.segment
         else:
@@ -179,10 +261,77 @@ class Separator:
         self.sources = self.separator.model.sources
         self.separating = False
 
+    def ensureDownloaded(self, model):
+        if model == "demucs_unittest":
+            return
+        if model in downloaded_models:
+            return
+        if isinstance(remote_urls[model], list):
+            for i in remote_urls[model]:
+                self.ensureDownloaded(i)
+            return
+        # Download codes modified from torch.hub
+        try:
+            url = remote_urls[model]
+        except KeyError:
+            err = "Model %s not found\n" % model
+            err += "Downloaded models: " + json.dumps(downloaded_models)
+            err += "\nRemote models: " + json.dumps(remote_urls)
+            raise RuntimeError(err)
+        self.updateStatus("Downloading model %s" % model)
+        logging.info("Downloading model %s from %s" % (model, url))
+        next_update = 0.0
+        req = urllib.request.Request(url, headers={"User-Agent": "torch.hub"})
+        u = urllib.request.urlopen(req)
+        meta = u.info()
+        if hasattr(meta, "getheaders"):
+            content_length = meta.getheaders("Content-Length")
+        else:
+            content_length = meta.get_all("Content-Length")
+        if content_length is not None and len(content_length) > 0:
+            file_size = int(content_length[0])
+        file_name = urllib.parse.urlparse(url).path.split("/")[-1]
+        tmp_name = file_name + ".tmp"
+        tmp_file = shared.model_cache / "checkpoints" / tmp_name  # type: pathlib.Path
+        tmp_file.unlink(missing_ok=True)
+        f = open(str(tmp_file), "wb")
+        file_size_dl = 0
+        if len(chunks := file_name.rsplit(".", 1)[0].rsplit("-", 1)) > 1:
+            checksum = chunks[-1]
+            hasher = hashlib.sha256()
+        else:
+            checksum = None
+        while True:
+            buffer = u.read(8192)
+            if not buffer:
+                break
+            file_size_dl += len(buffer)
+            f.write(buffer)
+            if checksum is not None:
+                hasher.update(buffer)
+            if time.time() > next_update:
+                status = "Downloading model %s: %s / %s (%.2f%%)" % (
+                    model,
+                    shared.HSize(file_size_dl),
+                    shared.HSize(file_size),
+                    file_size_dl * 100.0 / file_size,
+                )
+                self.updateStatus(status)
+                next_update = time.time() + 0.5
+        f.close()
+        if checksum is not None:
+            if not hasher.hexdigest().startswith(checksum):
+                tmp_file.unlink(missing_ok=True)
+                logging.error(
+                    "Checksum mismatch for %s: received %s, expected %s" % (model, hasher.hexdigest(), checksum)
+                )
+                raise RuntimeError("Checksum mismatch")
+        self.updateStatus("Downloaded model %s" % model)
+        shutil.move(str(tmp_file), str(tmp_file.parent / file_name))
+
     def modelInfo(self):
         channels = self.separator.model.audio_channels
         samplerate = self.separator.model.samplerate
-        sources = self.separator.model.sources
         if isinstance(self.separator.model, demucs.apply.BagOfModels):
             infos = []
             weights = self.separator.model.weights
@@ -204,7 +353,7 @@ class Separator:
                     self.repo if self.repo is not None else '"remote"',
                     channels,
                     samplerate,
-                    ", ".join(sources),
+                    ", ".join(self.sources),
                     "\n".join(infos),
                 )
             )
@@ -215,7 +364,7 @@ class Separator:
             self.separator.model.__class__.__name__,
             channels,
             samplerate,
-            ", ".join(sources),
+            ", ".join(self.sources),
         )
 
     def startSeparate(self, *args, **kwargs):
@@ -316,9 +465,7 @@ class Separator:
             logging.info("Running separation...")
             self.time_hists.append((time.time(), 0))
             if src_channels != self.separator.model.audio_channels:
-                out = {}
-                for stem in self.separator.model.sources:
-                    out[stem] = torch.zeros(src_channels, wav_torch.shape[1], dtype=torch.float32)
+                out = {stem: torch.zeros(1, wav_torch.shape[1], dtype=torch.float32) for stem in self.sources}
                 self.in_length = src_channels
                 self.out_length = 0
                 for i in range(src_channels):
@@ -341,6 +488,6 @@ class Separator:
             self.separating = False
             return
         logging.info("Saving separated audio...")
-        save_callback(file, out, self.save_callback, item, finishCallback)
+        save_callback(file, wav_torch, out, self.save_callback, item, finishCallback)
         self.separating = False
         return
