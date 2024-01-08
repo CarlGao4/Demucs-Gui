@@ -1191,8 +1191,13 @@ class Mixer(QWidget):
         self.outputs_table.currentItemChanged.connect(self.selectedItemChanged)
 
         self.delegate = DelegateCallback(self)
-        self.delegate.addDelegate(FileNameDelegate(), lambda x: x.column() == 1)
-        self.delegate.addDelegate(PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1), lambda x: x.column() > 1)
+        self.delegate.addDelegate(
+            FileNameDelegate(), lambda x: x.column() == 1 and x.row() >= len(main_window.separator.sources) * 3
+        )
+        self.delegate.addDelegate(
+            PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1),
+            lambda x: x.column() > 1 and x.row() >= len(main_window.separator.sources) * 3,
+        )
         self.outputs_table.setItemDelegate(self.delegate)
 
         # Single stems

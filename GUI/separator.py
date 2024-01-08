@@ -394,7 +394,7 @@ class Separator:
         self.setAudioProgress(min(1.0, float(progress)), self.item)
         current_time = time.time()
         self.time_hists.append((current_time, progress))
-        if current_time - self.last_update_eta > 1:
+        if current_time - self.last_update_eta > 0.5:
             while len(self.time_hists) >= 20 and current_time - self.time_hists[0][0] > 15:
                 self.time_hists.pop(0)
             if len(self.time_hists) >= 2 and progress != self.time_hists[0][1]:
