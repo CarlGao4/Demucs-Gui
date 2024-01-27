@@ -1,7 +1,7 @@
 --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # demucs>=4.1.0a2
-git+https://github.com/CarlGao4/demucs.git@4.1.0-ta2.1  # Use git repo as it 4.1.0 hasn't been pushed to PyPI
+git+https://github.com/adefossez/demucs.git  # Use git repo as it 4.1.0 hasn't been pushed to PyPI
 numpy
 psutil>=5.7.0
 pyperclip
@@ -15,3 +15,4 @@ torchaudio==2.1.0a0  # This is a requirement of demucs but not Demucs-GUI, added
 intel-extension-for-pytorch==2.1.10
 mkl
 mkl-dpcpp
+certifi

@@ -10,3 +10,4 @@ Soundfile>=0.9.0
 soxr>=0.3.6
 packaging
 ordered-set
+certifi

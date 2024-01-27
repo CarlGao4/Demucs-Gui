@@ -14,13 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import certifi
+import os
+
+# Use certifi to get CA certificates
+os.environ["SSL_CERT_FILE"] = certifi.where()
+
 import __main__
 import functools
 import json
 import logging
 import lzma
 import ordered_set
-import os
 import pathlib
 import pickle
 import subprocess
