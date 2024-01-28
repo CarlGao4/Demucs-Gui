@@ -1,0 +1,4 @@
+contact_links:
+  - name: Ask questions
+    url: "https://github.com/CarlGao4/Demucs-Gui/discussions?discussions_q="
+    about: Ask a question about usage, codes or other information about this project.
