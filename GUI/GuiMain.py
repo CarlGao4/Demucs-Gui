@@ -902,6 +902,7 @@ class SaveOptions(QGroupBox):
                 ext=self.file_format.currentText(),
                 model=main_window.model_selector.select_combobox.currentText(),
             )
+            shared.AddHistory("save_location", file_path_str)
             if self.location_group.checkedId() == 0:
                 file_path = file.parent / file_path_str
             else:
