@@ -390,8 +390,6 @@ class Separator:
         progress += progress_model * progress_per_model
         progress *= Fraction(1, self.in_length)
         progress += Fraction(self.out_length, self.in_length)
-        self.setModelProgress(min(1.0, float(progress_shift)))
-        self.setAudioProgress(min(1.0, float(progress)), self.item)
         current_time = time.time()
         self.time_hists.append((current_time, progress))
         if current_time - self.last_update_eta > 0.5:
@@ -411,6 +409,11 @@ class Separator:
                 eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
             self.updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
             self.last_update_eta = current_time
+        pause_start = time.time()
+        self.setModelProgress(min(1.0, float(progress_shift)))
+        self.setAudioProgress(min(1.0, float(progress)), self.item)
+        pause_end = time.time()
+        self.time_hists = [(i[0] + pause_end - pause_start, i[1]) for i in self.time_hists]
 
     def save_callback(self, *args):
         audio.save_audio(*args, self.separator.samplerate, self.updateStatus)

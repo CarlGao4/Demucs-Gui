@@ -264,6 +264,8 @@ class MainWindow(QMainWindow):
         self.setMenuBar(self.menubar)
 
         self.restarting = False
+        self._status_prefix = ""
+        self._status_text = ""
 
         shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x)))
 
@@ -329,6 +331,15 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
 
+    @property
+    def status_prefix(self):
+        return self._status_prefix
+    
+    @status_prefix.setter
+    def status_prefix(self, value):
+        self._status_prefix = value
+        self.refreshStatusText()
+
     def showErrorFunc(self, title, text):
         self.m.critical(self, title, text)
 
@@ -339,7 +350,11 @@ class MainWindow(QMainWindow):
         self.m.warning(self, title, text)
 
     def setStatusTextFunc(self, text):
-        self.statusBar().showMessage(text)
+        self._status_text = text
+        self.statusBar().showMessage(self.status_prefix + text)
+
+    def refreshStatusText(self):
+        self.setStatusText.emit(self._status_text)
 
     def open_log(self):
         if sys.platform == "win32":
@@ -1331,6 +1346,8 @@ class SeparationControl(QWidget):
         super().__init__()
 
         self.stop_now = False
+        self.not_paused = threading.Event()
+        self.not_paused.set()
 
         self.start_button = QPushButton()
         self.start_button.setText("Start separation")
@@ -1339,6 +1356,10 @@ class SeparationControl(QWidget):
         self.stop_button = QPushButton()
         self.stop_button.setText("Stop current audio")
         self.stop_button.clicked.connect(self.stopCurrent)
+
+        self.pause_resume_button = QPushButton()
+        self.pause_resume_button.setText("Pause")
+        self.pause_resume_button.clicked.connect(self.pauseResume)
 
         self.current_model_label = QLabel()
         self.current_model_label.setText("Current model:")
@@ -1357,12 +1378,15 @@ class SeparationControl(QWidget):
         self.current_audio_progressbar.setMinimumWidth(400)
 
         self.widget_layout = QGridLayout()
-        self.widget_layout.addWidget(self.start_button, 0, 0)
-        self.widget_layout.addWidget(self.stop_button, 1, 0)
-        self.widget_layout.addWidget(self.current_model_label, 0, 1)
-        self.widget_layout.addWidget(self.current_audio_label, 1, 1)
-        self.widget_layout.addWidget(self.current_model_progressbar, 0, 2)
-        self.widget_layout.addWidget(self.current_audio_progressbar, 1, 2)
+        self.buttons_layout = QHBoxLayout()
+        self.buttons_layout.addWidget(self.start_button)
+        self.buttons_layout.addWidget(self.stop_button)
+        self.buttons_layout.addWidget(self.pause_resume_button)
+        self.widget_layout.addLayout(self.buttons_layout, 0, 0, 1, 2)
+        self.widget_layout.addWidget(self.current_model_label, 1, 0)
+        self.widget_layout.addWidget(self.current_audio_label, 2, 0)
+        self.widget_layout.addWidget(self.current_model_progressbar, 1, 1)
+        self.widget_layout.addWidget(self.current_audio_progressbar, 2, 1)
 
         self.setLayout(self.widget_layout)
 
@@ -1382,15 +1406,23 @@ class SeparationControl(QWidget):
         item.setData(ProgressDelegate.TextRole, "")
 
     def setModelProgress(self, value):
+        global main_window
         if self.stop_now:
             self.stop_now = False
             raise KeyboardInterrupt
+        if not self.not_paused.is_set():
+            main_window.status_prefix = "(Paused) "
+            self.not_paused.wait()
         self.setModelProgressSignal.emit(value)
 
     def setAudioProgress(self, value, item: QTableWidgetItem):
+        global main_window
         if self.stop_now:
             self.stop_now = False
             raise KeyboardInterrupt
+        if not self.not_paused.is_set():
+            main_window.status_prefix = "(Paused) "
+            self.not_paused.wait()
         self.setAudioProgressSignal.emit(value, item)
 
     def setStatusForItem(self, status, item: QTableWidgetItem):
@@ -1401,23 +1433,24 @@ class SeparationControl(QWidget):
             item.setData(ProgressDelegate.TextRole, "Writing")
 
     def currentFinished(self, status, item: QTableWidgetItem):
-        if status == shared.FileStatus.Finished:
-            item.setData(ProgressDelegate.TextRole, "Finished")
-            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Finished])
-            main_window.setStatusText.emit(
-                "Separation finished: %s" % main_window.file_queue.table.item(item.row(), 0).text()
-            )
-        elif status == shared.FileStatus.Failed:
-            item.setData(ProgressDelegate.TextRole, "Failed")
-            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Failed])
-            item.setData(ProgressDelegate.ProgressRole, 0)
-        elif status == shared.FileStatus.Cancelled:
-            item.setData(ProgressDelegate.TextRole, "Cancelled")
-            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Cancelled])
-            item.setData(ProgressDelegate.ProgressRole, 0)
-        elif status == shared.FileStatus.Writing:
-            item.setData(ProgressDelegate.TextRole, "Writing")
-            item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
+        match status:
+            case shared.FileStatus.Finished:
+                item.setData(ProgressDelegate.TextRole, "Finished")
+                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Finished])
+                main_window.setStatusText.emit(
+                    "Separation finished: %s" % main_window.file_queue.table.item(item.row(), 0).text()
+                )
+            case shared.FileStatus.Failed:
+                item.setData(ProgressDelegate.TextRole, "Failed")
+                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Failed])
+                item.setData(ProgressDelegate.ProgressRole, 0)
+            case shared.FileStatus.Cancelled:
+                item.setData(ProgressDelegate.TextRole, "Cancelled")
+                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Cancelled])
+                item.setData(ProgressDelegate.ProgressRole, 0)
+            case shared.FileStatus.Writing:
+                item.setData(ProgressDelegate.TextRole, "Writing")
+                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
         if self.stop_now:
             self.stop_now = False
         if status not in [shared.FileStatus.Writing]:
@@ -1462,6 +1495,20 @@ class SeparationControl(QWidget):
         if self.start_button.isEnabled():
             return
         self.stop_now = True
+        if not self.not_paused.is_set():
+            self.pauseResume()
+            self.pauseResume()
+
+    def pauseResume(self):
+        global main_window
+        if self.not_paused.is_set():
+            self.not_paused.clear()
+            self.pause_resume_button.setText("Resume")
+            main_window.status_prefix = "(Pausing) "
+        else:
+            self.not_paused.set()
+            self.pause_resume_button.setText("Pause")
+            main_window.status_prefix = ""
 
 
 if __name__ == "__main__":
