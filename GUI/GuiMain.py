@@ -101,6 +101,7 @@ import os
 import packaging.version
 import pathlib
 import platform
+import pprint
 import psutil
 import random
 import shlex
@@ -261,6 +262,15 @@ class MainWindow(QMainWindow):
             self.menu_aot = Action("About AOT", self, self.ask_AOT)
             self.menu_about.addAction(self.menu_aot)
         self.menubar.addAction(self.menu_about.menuAction())
+
+        if shared.debug:
+            self.menu_debug = QMenu("Debug")
+            self.menu_debug_settings = Action("Print settings", self, self.printSettings)
+            self.menu_debug_history = Action("Print history", self, self.printHistory)
+            self.menu_debug.addAction(self.menu_debug_settings)
+            self.menu_debug.addAction(self.menu_debug_history)
+            self.menubar.addAction(self.menu_debug.menuAction())
+
         self.setMenuBar(self.menubar)
 
         self.restarting = False
@@ -330,6 +340,12 @@ class MainWindow(QMainWindow):
             return super().closeEvent(event)
         else:
             event.ignore()
+
+    def printSettings(self):
+        pprint.pprint(shared.settings, sort_dicts=False, stream=sys.stderr)
+
+    def printHistory(self):
+        pprint.pprint(shared.history, sort_dicts=False, stream=sys.stderr)
 
     @property
     def status_prefix(self):
