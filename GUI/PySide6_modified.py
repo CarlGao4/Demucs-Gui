@@ -266,6 +266,23 @@ class FileNameDelegate(QStyledItemDelegate):
         editor.setGeometry(option.rect)
 
 
+class DoNothingDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def createEditor(self, parent, option, index):
+        return None
+
+    def setEditorData(self, editor, index):  # type: ignore[override]
+        pass
+
+    def setModelData(self, editor, model, index):  # type: ignore[override]
+        pass
+
+    def updateEditorGeometry(self, editor, option, index):  # type: ignore[override]
+        pass
+
+
 # A simpler QAction that can be created with a callback
 class Action(QAction):
     def __init__(self, text, parent=None, callback=None):

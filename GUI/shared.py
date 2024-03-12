@@ -128,7 +128,12 @@ def InitializeFolder():
 def SetSetting(attr, value):
     global settings, settingsFile, settingsLock
     with settingsLock:
-        logging.debug('(%s) Set setting "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
+        func_name = traceback.extract_stack()
+        if func_name[-2].name == "GetSetting":
+            func_name = func_name[-3].name
+        else:
+            func_name = func_name[-2].name
+        logging.debug('(%s) Set setting "%s" to %s' % (func_name, attr, str(value)))
         if attr in settings and settings[attr] == value:
             logging.debug("Setting not changed, ignored")
             return
@@ -151,6 +156,33 @@ def GetSetting(attr, default=None, autoset=True):
         return default
 
 
+def _get_from_dict(dataDict, mapList):
+    for key in mapList:
+        if key in dataDict:
+            dataDict = dataDict[key]
+        else:
+            return None
+    return dataDict
+
+
+def _set_to_dict(dataDict, mapList, value):
+    if value is None:
+        for i in reversed(range(len(mapList))):
+            key = mapList[i]
+            parent = _get_from_dict(dataDict, mapList[:i])
+            if parent and key in parent:
+                del parent[key]
+                if not parent:
+                    continue
+            break
+    else:
+        for key in mapList[:-1]:
+            if key not in dataDict:
+                dataDict[key] = {}
+            dataDict = dataDict[key]
+        dataDict[mapList[-1]] = value
+
+
 def _SaveHistory():
     global history, historyFile, historyLock
     with historyLock:
@@ -162,50 +194,57 @@ def _SaveHistory():
             logging.warning("Failed to save history:\n%s" % traceback.format_exc())
 
 
-def SetHistory(attr, value):
+def SetHistory(*attr, value):
     global history, historyFile, historyLock
     with historyLock:
-        logging.debug('(%s) Set history "%s" to %s' % (traceback.extract_stack()[-2].name, attr, str(value)))
-        if attr in history and history[attr] == value:
+        func_name = traceback.extract_stack()
+        if func_name[-2].name in ["GetHistory", "AddHistory", "ResetHistory"]:
+            func_name = func_name[-3].name
+        else:
+            func_name = func_name[-2].name
+        logging.debug("(%s) Set history %s to %s" % (func_name, attr, str(value)))
+        if _get_from_dict(history, attr) == value:
             logging.debug("History not changed, ignored")
             return
-        history[attr] = value
+        _set_to_dict(history, attr, value)
     _SaveHistory()
 
 
-def GetHistory(attr, default=None, autoset=True, use_ordered_set=False):
+def GetHistory(*attr, default=None, autoset=True, use_ordered_set=False):
     global history
-    if attr in history:
-        if (not use_ordered_set) or type(history[attr]) is ordered_set.OrderedSet:
-            return history[attr]
-        return ordered_set.OrderedSet([history[attr]])
-    else:
-        if autoset and not use_ordered_set:
-            SetHistory(attr, default)
+    if _get_from_dict(history, attr) is not None:
+        if (not use_ordered_set) or type(_get_from_dict(history, attr)) is ordered_set.OrderedSet:
+            return _get_from_dict(history, attr)
+        return ordered_set.OrderedSet([_get_from_dict(history, attr)])
+    elif autoset:
+        if not use_ordered_set:
+            SetHistory(*attr, value=default)
             return default
         else:
-            SetHistory(attr, ordered_set.OrderedSet([default]))
-            return history[attr]
+            SetHistory(*attr, value=ordered_set.OrderedSet([default]))
+            return _get_from_dict(history, attr)
+    return default
 
 
-def AddHistory(attr, value):
-    old_value = GetHistory(attr, ordered_set.OrderedSet(), False)
+def AddHistory(*attr, value):
+    old_value = GetHistory(*attr, default=ordered_set.OrderedSet(), autoset=False)
     if type(old_value) is not ordered_set.OrderedSet:
         old_value = ordered_set.OrderedSet([old_value])
-    SetHistory(attr, ordered_set.OrderedSet([value]) | old_value)
+    if value in old_value:  # Move to front
+        old_value.remove(value)
+    SetHistory(*attr, value=ordered_set.OrderedSet([value]) | old_value)
 
 
-def ResetHistory(attr=None):
+def ResetHistory(*attr):
     global history, historyFile, historyLock
-    if attr is None:
+    if not attr:
         with historyLock:
             history = {}
         _SaveHistory()
     else:
-        if attr in history:
-            with historyLock:
-                history.pop(attr)
-            _SaveHistory()
+        with historyLock:
+            _set_to_dict(history, attr, None)
+        _SaveHistory()
 
 
 class FileStatus:

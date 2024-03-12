@@ -44,6 +44,10 @@ downloaded_models = {}
 remote_urls = {}
 
 
+class ModelSourceNameUnsupportedError(Exception):
+    pass
+
+
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
     global torch, demucs, audio, has_Intel, Intel_JIT_only
@@ -249,6 +253,12 @@ class Separator:
         if repo is None:
             self.ensureDownloaded(model)
         self.separator = demucs.api.Separator(model=model, repo=repo, progress=False)
+        if len(set(self.separator.model.sources)) != len(self.separator.model.sources):
+            raise ModelSourceNameUnsupportedError(
+                "Duplicate source names in model %s\nSources: %s" % (model, self.separator.model.sources)
+            )
+        if "origin" in self.separator.model.sources:
+            raise ModelSourceNameUnsupportedError("Source name 'origin' is reserved in model %s" % model)
         self.model = model
         self.repo = repo
         if not isinstance(self.separator.model, demucs.apply.BagOfModels):

@@ -35,6 +35,7 @@ if not shared.use_PyQt6:
         QGroupBox,
         QHBoxLayout,
         QHeaderView,
+        QInputDialog,
         QLabel,
         QLineEdit,
         QListWidget,
@@ -45,6 +46,7 @@ if not shared.use_PyQt6:
         QProgressBar,
         QPushButton,
         QRadioButton,
+        QSizePolicy,
         QSlider,
         QSpinBox,
         QStatusBar,
@@ -72,6 +74,7 @@ else:
         QGroupBox,
         QHBoxLayout,
         QHeaderView,
+        QInputDialog,
         QLabel,
         QLineEdit,
         QListWidget,
@@ -82,6 +85,7 @@ else:
         QProgressBar,
         QPushButton,
         QRadioButton,
+        QSizePolicy,
         QSlider,
         QSpinBox,
         QStatusBar,
@@ -94,7 +98,7 @@ else:
     )
 
 import datetime
-import functools
+import json
 import logging
 import logging.handlers
 import os
@@ -313,6 +317,8 @@ class MainWindow(QMainWindow):
     def loadModel(self, model, repo):
         try:
             self.separator = separator.Separator(model, repo, self.setStatusText.emit)
+        except separator.ModelSourceNameUnsupportedError as e:
+            return e
         except:
             logging.error(
                 "Failed to load model %s from %s:\n%s"
@@ -350,7 +356,7 @@ class MainWindow(QMainWindow):
     @property
     def status_prefix(self):
         return self._status_prefix
-    
+
     @status_prefix.setter
     def status_prefix(self, value):
         self._status_prefix = value
@@ -625,13 +631,19 @@ class ModelSelector(QWidget):
         success = main_window.loadModel(model_name, model_repo)
         end_time = time.perf_counter()
 
-        if not success:
-            main_window.showError.emit(
-                "Load model failed", "Failed to load model. Check log file for more information."
-            )
-            main_window.exec_in_main(lambda: self.setEnabled(True))
-            main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(True))
-            return
+        match success:
+            case False:
+                main_window.showError.emit(
+                    "Load model failed", "Failed to load model. Check log file for more information."
+                )
+                main_window.exec_in_main(lambda: self.setEnabled(True))
+                main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(True))
+                return
+            case separator.ModelSourceNameUnsupportedError as e:
+                main_window.showError.emit("Model not supported", str(e))
+                main_window.exec_in_main(lambda: self.setEnabled(True))
+                main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(True))
+                return
 
         model_info = main_window.separator.modelInfo()
         main_window.exec_in_main(lambda: main_window.model_selector.model_info.setText(model_info))
@@ -798,8 +810,8 @@ class SepParamSettings(QGroupBox):
         self.separate_once_added = QCheckBox()
         self.separate_once_added.setText("Separate once added")
         self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
-        self.separate_once_added.setChecked(shared.GetHistory("separate_once_added", False))
-        self.separate_once_added.stateChanged.connect(functools.partial(shared.SetHistory, "separate_once_added"))
+        self.separate_once_added.setChecked(shared.GetHistory("separate_once_added", default=False))
+        self.separate_once_added.stateChanged.connect(lambda x: shared.SetHistory("separate_once_added", value=x))
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.device_label, 0, 0)
@@ -850,15 +862,19 @@ class SaveOptions(QGroupBox):
         self.loc_absolute_path_button.setText("Absolute path")
         self.location_group.addButton(self.loc_relative_path_button, 0)
         self.location_group.addButton(self.loc_absolute_path_button, 1)
-        self.location_group.idClicked.connect(functools.partial(shared.SetHistory, "save_location_type"))
-        if shared.GetHistory("save_location_type", 0) == 0:
+        self.location_group.idClicked.connect(lambda x: shared.SetHistory("save_location_type", value=x))
+        if shared.GetHistory("save_location_type", default=0) == 0:
             self.loc_relative_path_button.setChecked(True)
         else:
             self.loc_absolute_path_button.setChecked(True)
         self.loc_input = QComboBox()
         self.loc_input.setEditable(True)
         self.loc_input.addItems(
-            list(shared.GetHistory("save_location", "separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True))
+            list(
+                shared.GetHistory(
+                    "save_location", default="separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True
+                )
+            )
         )
         self.loc_input.setCurrentIndex(0)
         self.browse_button = QPushButton()
@@ -872,16 +888,16 @@ class SaveOptions(QGroupBox):
 
         self.clip_mode = QComboBox()
         self.clip_mode.addItems(["rescale", "clamp", "none"])
-        self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", "rescale"))
-        self.clip_mode.currentTextChanged.connect(functools.partial(shared.SetHistory, "clip_mode"))
+        self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", default="rescale"))
+        self.clip_mode.currentTextChanged.connect(lambda x: shared.SetHistory("clip_mode", value=x))
 
         self.file_format_label = QLabel()
         self.file_format_label.setText("File format:")
 
         self.file_format = QComboBox()
         self.file_format.addItems(["wav", "flac"])
-        self.file_format.setCurrentText(shared.GetHistory("file_format", "flac"))
-        self.file_format.currentTextChanged.connect(functools.partial(shared.SetHistory, "file_format"))
+        self.file_format.setCurrentText(shared.GetHistory("file_format", default="flac"))
+        self.file_format.currentTextChanged.connect(lambda x: shared.SetHistory("file_format", value=x))
 
         self.sample_fmt_label = QLabel()
         self.sample_fmt_label.setText("Sample format:")
@@ -890,8 +906,8 @@ class SaveOptions(QGroupBox):
         self.sample_fmt.addItem("int16", "PCM_16")
         self.sample_fmt.addItem("int24", "PCM_24")
         self.sample_fmt.addItem("float32", "FLOAT")
-        self.sample_fmt.setCurrentText(shared.GetHistory("sample_fmt", "int16"))
-        self.sample_fmt.currentTextChanged.connect(functools.partial(shared.SetHistory, "sample_fmt"))
+        self.sample_fmt.setCurrentText(shared.GetHistory("sample_fmt", default="int16"))
+        self.sample_fmt.currentTextChanged.connect(lambda x: shared.SetHistory("sample_fmt", value=x))
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -924,6 +940,7 @@ class SaveOptions(QGroupBox):
     @shared.thread_wrapper(daemon=True)
     def save(self, file, origin, tensor, save_func, item, finishCallback):
         self.saving += 1
+        main_window.mixer.setEnable(False)
         finishCallback(shared.FileStatus.Writing, item)
         for stem, stem_data in main_window.mixer.mix(origin, tensor):
             file_path_str = self.loc_input.currentText().format(
@@ -950,6 +967,8 @@ class SaveOptions(QGroupBox):
             file_path.parent.mkdir(parents=True, exist_ok=True)
             save_func(file_path, data, self.sample_fmt.currentData())
         self.saving -= 1
+        if self.saving == 0:
+            main_window.mixer.setEnable(True)
         finishCallback(shared.FileStatus.Finished, item)
 
 
@@ -1209,9 +1228,42 @@ class Mixer(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.preset_stem_key = json.dumps(
+            list(sorted(main_window.separator.sources)), separators=(",", ":"), ensure_ascii=True
+        )
+        logging.info("Preset stem key: %s" % self.preset_stem_key)
+
+        self.preset_label = QLabel()
+        self.preset_label.setText("Preset:")
+        self.preset_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        self.preset_combobox = QComboBox()
+        self.preset_combobox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.loadSavedPresets()
+
+        self.preset_apply = QPushButton()
+        self.preset_apply.setText("Apply")
+        self.preset_apply.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.preset_apply.clicked.connect(self.applyPreset)
+
+        self.preset_save = QPushButton()
+        self.preset_save.setText("Save")
+        self.preset_save.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.preset_save.clicked.connect(self.savePreset)
+
+        self.preset_set_default = QPushButton()
+        self.preset_set_default.setText("Set as default")
+        self.preset_set_default.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.preset_set_default.clicked.connect(self.setDefaultPreset)
+
+        self.preset_delete = QPushButton()
+        self.preset_delete.setText("Delete")
+        self.preset_delete.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.preset_delete.clicked.connect(self.deletePreset)
+
         self.outputs_table = QTableWidgetWithCheckBox()
         self.outputs_table.setColumnCount(len(main_window.separator.sources) + 2)
-        self.outputs_table.setHorizontalHeaderLabels(["Stem name", "origin"] + list(main_window.separator.sources))
+        self.outputs_table.setHorizontalHeaderLabels(["Output name", "origin"] + list(main_window.separator.sources))
 
         self.outputs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.outputs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -1232,6 +1284,68 @@ class Mixer(QWidget):
         )
         self.outputs_table.setItemDelegate(self.delegate)
 
+        default_preset = shared.GetHistory("default_preset", self.preset_stem_key, default=None, autoset=False)
+        if (
+            not default_preset
+            or default_preset.lower() == "default"
+            or default_preset not in shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False)
+        ):
+            self.addDefaultStems()
+        else:
+            self.preset_combobox.setCurrentText(default_preset)
+            self.applyPreset()
+
+        self.remove_button = QPushButton()
+        self.remove_button.setText("Remove")
+        self.remove_button.clicked.connect(self.removeSelected)
+
+        self.add_button = QPushButton()
+        self.add_button.setText("Add")
+        self.add_button.clicked.connect(self.addStem)
+
+        self.duplicate_button = QPushButton()
+        self.duplicate_button.setText("Duplicate")
+        self.duplicate_button.clicked.connect(self.duplicateSelected)
+
+        self.slider = QSlider()
+        self.slider.setOrientation(Qt.Orientation.Horizontal)
+        self.slider.setRange(-500, 500)
+
+        self.slider_value_changed_by_user = True
+        self.slider.valueChanged.connect(self.sliderValueChanged)
+
+        self.widget_layout = QVBoxLayout()
+        self.preset_layout = QHBoxLayout()
+        self.preset_layout.addWidget(self.preset_label, 0)
+        self.preset_layout.addWidget(self.preset_combobox, 1)
+        self.preset_layout.addWidget(self.preset_apply, 0)
+        self.preset_layout.addWidget(self.preset_save, 0)
+        self.preset_layout.addWidget(self.preset_delete, 0)
+        self.preset_layout.addWidget(self.preset_set_default, 0)
+        self.widget_layout.addLayout(self.preset_layout)
+        self.widget_layout.addWidget(self.outputs_table)
+        self.button_layout = QHBoxLayout()
+        self.button_layout.addWidget(self.remove_button)
+        self.button_layout.addWidget(self.add_button)
+        self.button_layout.addWidget(self.duplicate_button)
+        self.widget_layout.addLayout(self.button_layout)
+        self.widget_layout.addWidget(self.slider)
+        self.setLayout(self.widget_layout)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
+            self.removeSelected()
+
+    def removeSelected(self):
+        if max(i.row() for i in self.outputs_table.selectedIndexes()) < len(main_window.separator.sources) * 3:
+            main_window.showError.emit("Cannot remove default stems", "Cannot remove default stems")
+        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
+        for i in indexes:
+            if i < len(main_window.separator.sources) * 3:
+                break
+            self.outputs_table.removeRow(i)
+
+    def addDefaultStems(self):
         # Single stems
         for idx, stem in enumerate(main_window.separator.sources):
             self.outputs_table.addRow(
@@ -1262,50 +1376,101 @@ class Mixer(QWidget):
                 False,
             )
 
-        self.remove_button = QPushButton()
-        self.remove_button.setText("Remove")
-        self.remove_button.clicked.connect(self.removeSelected)
+    def addStem(self, *, stem_name="stem", enabled=True):
+        self.outputs_table.addRow([stem_name] + ["0%\u3000"] * (len(main_window.separator.sources) + 1), enabled)
 
-        self.add_button = QPushButton()
-        self.add_button.setText("Add")
-        self.add_button.clicked.connect(self.addStem)
+    def loadSavedPresets(self):
+        self.preset_combobox.clear()
+        self.preset_combobox.addItems(["Default"])
+        saved_presets = list(shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False).keys())
+        logging.info("Adding saved presets: %s" % saved_presets)
+        self.preset_combobox.addItems(saved_presets)
 
-        self.duplicate_button = QPushButton()
-        self.duplicate_button.setText("Duplicate")
-        self.duplicate_button.clicked.connect(self.duplicateSelected)
+    def savePreset(self):
+        name, ok = QInputDialog.getText(self, "Save preset", "Preset name:")
+        if not ok:
+            return
+        if not name:
+            main_window.showError.emit("Preset name cannot be empty", "Preset name cannot be empty")
+            return
+        if name.lower() == "default":
+            main_window.showError.emit('Preset name cannot be "default"', 'Preset name cannot be "default"')
+            return
+        logging.info("Saving preset name: %s" % name)
+        if name in shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False):
+            if not main_window.m.question("Preset name already exists", "Preset name already exists, overwrite?"):
+                return
+            logging.info("Preset name already exists, overwriting")
+        preset = [{}, []]
+        # For default stems, we only save whether it is enabled
+        for i in range(len(main_window.separator.sources) * 3):
+            preset[0][self.outputs_table.item(i, 0).text()] = self.outputs_table.getCheckState(i)
+        for i in range(len(main_window.separator.sources) * 3, self.outputs_table.rowCount()):
+            # We can't assume that all models have sorted sources, so use dict to store the values
+            # Item format: ("stem name", {"source": "value"}, bool("enabled"))
+            preset[1].append(
+                (
+                    self.outputs_table.item(i, 0).text(),
+                    {
+                        self.outputs_table.horizontalHeaderItem(j + 1).text(): int(
+                            self.outputs_table.item(i, j + 1).data(Qt.ItemDataRole.EditRole)[:-2]
+                        )
+                        for j in range(len(main_window.separator.sources) + 1)
+                    },
+                    self.outputs_table.getCheckState(i),
+                )
+            )
+        shared.SetHistory("presets", self.preset_stem_key, name, value=preset)
+        logging.info("Preset data:\n%s" % json.dumps(preset, ensure_ascii=False, indent=4))
+        self.loadSavedPresets()
 
-        self.slider = QSlider()
-        self.slider.setOrientation(Qt.Orientation.Horizontal)
-        self.slider.setRange(-500, 500)
+    def setDefaultPreset(self):
+        shared.SetHistory("default_preset", self.preset_stem_key, value=self.preset_combobox.currentText())
+        logging.info("Set default preset to %s" % self.preset_combobox.currentText())
 
-        self.slider_value_changed_by_user = True
-        self.slider.valueChanged.connect(self.sliderValueChanged)
+    def deletePreset(self):
+        wait_for_delete = self.preset_combobox.currentText()
+        if wait_for_delete.lower() == "default":
+            main_window.showError.emit('Cannot delete "default" preset', 'Cannot delete "default" preset')
+            return
+        if (
+            main_window.m.question(
+                main_window,
+                "Delete preset",
+                f"Are you sure you want to delete preset {wait_for_delete}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.No
+        ):
+            return
+        logging.info("Deleting preset %s" % wait_for_delete)
+        shared.ResetHistory("presets", self.preset_stem_key, wait_for_delete)
+        self.loadSavedPresets()
 
-        self.widget_layout = QVBoxLayout()
-        self.widget_layout.addWidget(self.outputs_table)
-        self.button_layout = QHBoxLayout()
-        self.button_layout.addWidget(self.remove_button)
-        self.button_layout.addWidget(self.add_button)
-        self.button_layout.addWidget(self.duplicate_button)
-        self.widget_layout.addLayout(self.button_layout)
-        self.widget_layout.addWidget(self.slider)
-        self.setLayout(self.widget_layout)
-
-    def keyPressEvent(self, event):
-        if event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
-            self.removeSelected()
-
-    def removeSelected(self):
-        if max(i.row() for i in self.outputs_table.selectedIndexes()) < len(main_window.separator.sources) * 3:
-            main_window.showError.emit("Cannot remove default stems", "Cannot remove default stems")
-        indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
-        for i in indexes:
-            if i < len(main_window.separator.sources) * 3:
-                break
-            self.outputs_table.removeRow(i)
-
-    def addStem(self):
-        self.outputs_table.addRow(["stem"] + ["0%\u3000" for _ in range(len(main_window.separator.sources) + 1)], True)
+    def applyPreset(self):
+        if self.preset_combobox.currentText().lower() == "default":
+            for _ in range(self.outputs_table.rowCount()):
+                self.outputs_table.removeRow(0)
+            self.addDefaultStems()
+        preset = shared.GetHistory("presets", self.preset_stem_key, self.preset_combobox.currentText(), autoset=False)
+        if not preset:
+            return
+        logging.info("Applying preset %s" % self.preset_combobox.currentText())
+        # First remove all stems (including default stems)
+        for _ in range(self.outputs_table.rowCount()):
+            self.outputs_table.removeRow(0)
+        # Add default stems and restore their enabled state
+        self.addDefaultStems()
+        for i in range(len(main_window.separator.sources) * 3):
+            self.outputs_table.setCheckState(i, preset[0][self.outputs_table.item(i, 0).text()])
+        # Add custom stems and restore their values and enabled state
+        for stem, sources, enabled in preset[1]:
+            # Calculate weights first
+            # The order of sources is not guaranteed, so we need to use the index of the source
+            weights = [stem, sources["origin"]]
+            for source in main_window.separator.sources:
+                weights.append(sources[source])
+            self.outputs_table.addRow(weights, enabled)
 
     def duplicateSelected(self):
         indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())))
@@ -1386,12 +1551,12 @@ class SeparationControl(QWidget):
         self.current_model_progressbar = QProgressBar()
         self.current_model_progressbar.setMaximum(65536)
         self.current_model_progressbar.setValue(0)
-        self.current_model_progressbar.setMinimumWidth(400)
+        self.current_model_progressbar.setMinimumWidth(450)
 
         self.current_audio_progressbar = QProgressBar()
         self.current_audio_progressbar.setMaximum(65536)
         self.current_audio_progressbar.setValue(0)
-        self.current_audio_progressbar.setMinimumWidth(400)
+        self.current_audio_progressbar.setMinimumWidth(450)
 
         self.widget_layout = QGridLayout()
         self.buttons_layout = QHBoxLayout()

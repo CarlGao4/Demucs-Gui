@@ -64,17 +64,17 @@ Once you've loaded a model, you can't load another model or unload it. The only 
 
 With mixer, you can mix different stems of a song together. This is more convenient than using a DAW when your purpose is simple (like just removing vocals from a song).
 
-On default, Demucs GUI has following presets:
+On default, Demucs GUI has following outputs:
 
 1. "Single stems": Do not mix at all, save the outputs of each stem separately. This is enabled by default.
 2. "Minus stems": Extract the specific stem from original audio (Or, original audio minus the specific stem).
 3. "No stems": Mix all the stems except the specific stem together.
 
-These presets are created for each stem.
+These outputs are created for each stem.
 
 You can enable or disable a stem by clicking on the checkbox on the left of the stem name. If you've selected more than one cells and clicked on a checkbox whose row has been selected, all the selected cells will be enabled or disabled.
 
-Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer. The parameters of default presets can't be changed.
+Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer. The parameters of default outputs can't be changed.
 
 You can also add your own stems by clicking "Add" button. Remember that **do not enable a stem with the same name as an existing stem**. The behavior of this is undefined.
 
@@ -123,7 +123,7 @@ Demucs GUI will overwrite existing files without warning. Remember to include `{
 
 Demucs GUI will use FFMpeg to read files if the default backend Soundfile (which uses libsndfile) fails, which enables separating a video (its audio stream, actually). When reading with FFMpeg, Demucs GUI will call `ffmpeg -v level+warning -i "{file}" -map a:0 -ar {samplerate} -c:a pcm_f32le -f wav -` and decode the stdout. So only the first stream of the file will be separated. If the file contains no audio stream, separation will fail. *\*New in 1.0*
 
-Demucs GUI will calls FFMpeg according to PATH environment variable. Before detecting FFMpeg, `./ffmpeg` will be added to PATH. You can control where to append it (before or after the original PATH) in the config file. *\*New in 1.0*
+Demucs GUI will calls FFMpeg according to PATH environment variable. Before detecting FFMpeg, `./ffmpeg` will be added to PATH. You can control where to insert it (before or after the original PATH) in the config file. *\*New in 1.0*
 
 ## About the config file
 
