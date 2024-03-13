@@ -41,7 +41,7 @@ Memory: About at least 8GB of total memory (physical and swap) would be required
 GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5) and Apple MPS are supported. At least 2GB of private memory is required.
 
 ### Running the codes yourself
-At least Python 3.9 is required. Other requirements please refer to [Installing binaries](#installing-binaries).
+At least Python 3.10 is required. Other requirements please refer to [Installing binaries](#installing-binaries).
 
 ## Downloads
 Binaries for download are available [here](https://github.com/CarlGao4/Demucs-Gui/releases).
