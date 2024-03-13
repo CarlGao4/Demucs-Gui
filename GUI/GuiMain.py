@@ -940,7 +940,7 @@ class SaveOptions(QGroupBox):
     @shared.thread_wrapper(daemon=True)
     def save(self, file, origin, tensor, save_func, item, finishCallback):
         self.saving += 1
-        main_window.mixer.setEnable(False)
+        main_window.mixer.setEnabled(False)
         finishCallback(shared.FileStatus.Writing, item)
         for stem, stem_data in main_window.mixer.mix(origin, tensor):
             file_path_str = self.loc_input.currentText().format(
@@ -968,7 +968,7 @@ class SaveOptions(QGroupBox):
             save_func(file_path, data, self.sample_fmt.currentData())
         self.saving -= 1
         if self.saving == 0:
-            main_window.mixer.setEnable(True)
+            main_window.mixer.setEnabled(True)
         finishCallback(shared.FileStatus.Finished, item)
 
 
