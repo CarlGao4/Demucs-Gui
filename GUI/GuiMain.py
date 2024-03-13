@@ -1,7 +1,7 @@
 __version__ = "1.1b1"
 
 LICENSE = f"""Demucs-GUI {__version__}
-Copyright (C) 2022-2023  Carl Gao, Jize Guo, Rosario S.E.
+Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
 
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
