@@ -78,6 +78,12 @@ Double click on a cell of stem name to edit the name of the stem (this name will
 
 You can also add your own stems by clicking "Add" button. Remember that **do not enable a stem with the same name as an existing stem**. The behavior of this is undefined.
 
+#### Presets
+
+You can save the current mixer settings as a preset. The same preset can be used on any model with same stems. A preset will save custom stems and their enabled status and volume.
+
+You can also set a preset as default. The default preset will be loaded when you load a model with same stems. When you click on "Save as default" button, the preset selected in the dropdown list will be set as default, but not the current settings. To save the current settings as default, you should first save it as a preset, then set it as default.
+
 ### Some "useless" functions of separation queue
 
 1. You can drag and drop files to the queue to add them. (It's quite useful, isn't it?) But one thing is not supported: You can't drag a file or a folder from Windows to the application ran in WSL.
