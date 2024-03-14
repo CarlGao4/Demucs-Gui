@@ -1,5 +1,28 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.1b2*
+Release date: Mar. 14, 2024 (Happy pi day! :pie:)
+
+#### Fixes
+1. Can't save file
+
+#### Known issues
+If you run the code under this tag, you still can't save files. You should switch to the commit which updated this version to change log (this file).
+
+### *1.1b1*
+Release date: Mar. 13, 2024
+
+#### Updates
+1. Add mixer presets and default preset
+2. MKL AOT detection and suggestions
+3. Save "save location"
+
+#### Fixes
+1. SSLError when downloading remote models on macOS
+
+#### Known issues
+1. Can't save file
+
 ### *1.1a2*
 Release date: Jan. 1, 2024 (Happy New Year! :fireworks: :fireworks: :fireworks:)
 
