@@ -942,6 +942,7 @@ class SaveOptions(QGroupBox):
         self.saving += 1
         main_window.mixer.setEnabled(False)
         finishCallback(shared.FileStatus.Writing, item)
+        shared.AddHistory("save_location", value=self.loc_input.currentText())
         for stem, stem_data in main_window.mixer.mix(origin, tensor):
             file_path_str = self.loc_input.currentText().format(
                 track=file.stem,
@@ -950,7 +951,6 @@ class SaveOptions(QGroupBox):
                 ext=self.file_format.currentText(),
                 model=main_window.model_selector.select_combobox.currentText(),
             )
-            shared.AddHistory("save_location", value=file_path_str)
             if self.location_group.checkedId() == 0:
                 file_path = file.parent / file_path_str
             else:
