@@ -38,7 +38,7 @@ For Linux: Any system that can install and run python 3.11 (Because I'll pack th
 #### Hardware
 Memory: About at least 8GB of total memory (physical and swap) would be required. The longer the track you want to separate, the more memory will be required.
 
-GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5) and Apple MPS are supported. At least 2GB of private memory is required.
+GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5), Intel Arc & Iris Xe Graphics and Apple MPS are supported. At least 2GB of private memory is required.
 
 ### Running the codes yourself
 At least Python 3.10 is required. Other requirements please refer to [Installing binaries](#installing-binaries).

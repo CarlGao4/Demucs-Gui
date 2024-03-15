@@ -7,6 +7,8 @@ Release date: Mar. 14, 2024 (Happy pi day! :pie:)
 1. Can't save file
 
 #### Known issues
+1. Last saved file path and names will become default when you restart the application
+
 If you run the code under this tag, you still can't save files. You should switch to the commit which updated this version to change log (this file).
 
 ### *1.1b1*
