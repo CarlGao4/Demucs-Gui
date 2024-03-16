@@ -1090,6 +1090,7 @@ class FileQueue(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole + 0x100, random.random())
 
     def addFiles(self, files):
+        global main_window
         files = map(pathlib.Path, (i for i in files if len(i)))
         for file in files:
             if file.is_dir():
@@ -1100,6 +1101,12 @@ class FileQueue(QWidget):
                 with file_queue_lock:
                     row = self.table.rowCount()
                     self.table.insertRow(row)
+                    if row == 500:
+                        main_window.showWarning.emit(
+                            "Queue too long",
+                            "You have added more than 500 files to the queue. This may cause performance issues. "
+                            "You may switch to other tabs or minimize the window to reduce the impact.",
+                        )
                     if self.show_full_path:
                         self.table.setItem(row, 0, QTableWidgetItem(str(file)))
                     else:
