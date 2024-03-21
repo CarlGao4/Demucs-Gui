@@ -1,5 +1,16 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.1
+Release date: Mar. 21, 2024
+
+#### Fixes
+1. Will always save the last output file name as default output path
+
+#### Changes
+1. Warn the user when adding more than 500 files to the queue
+2. Warn the user if settings and preset not match when setting default preset
+3. Allowing users reset history location
+
 ### *1.1b2*
 Release date: Mar. 14, 2024 (Happy pi day! :pie:)
 
