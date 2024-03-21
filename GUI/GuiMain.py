@@ -243,7 +243,9 @@ class MainWindow(QMainWindow):
             "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
         )
         self.menu_clear_history = Action("Clear history (including mixer presets)", self, self.clear_history)
-        self.menu_clear_location = Action("Clear saved file location", self, lambda: shared.ResetHistory("save_location"))
+        self.menu_clear_location = Action(
+            "Clear saved file location", self, lambda: shared.ResetHistory("save_location")
+        )
         self.menu_check_update = Action(
             "Check for update",
             self,
@@ -871,7 +873,9 @@ class SaveOptions(QGroupBox):
             self.loc_absolute_path_button.setChecked(True)
         self.loc_input = QComboBox()
         self.loc_input.setEditable(True)
-        locations = list(shared.GetHistory("save_location", default="separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True))
+        locations = list(
+            shared.GetHistory("save_location", default="separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True)
+        )
         if "separated/{model}/{track}/{stem}.{ext}" not in locations:
             locations.append("separated/{model}/{track}/{stem}.{ext}")
         self.loc_input.addItems(locations)
@@ -1392,21 +1396,7 @@ class Mixer(QWidget):
         logging.info("Adding saved presets: %s" % saved_presets)
         self.preset_combobox.addItems(saved_presets)
 
-    def savePreset(self):
-        name, ok = QInputDialog.getText(self, "Save preset", "Preset name:")
-        if not ok:
-            return
-        if not name:
-            main_window.showError.emit("Preset name cannot be empty", "Preset name cannot be empty")
-            return
-        if name.lower() == "default":
-            main_window.showError.emit('Preset name cannot be "default"', 'Preset name cannot be "default"')
-            return
-        logging.info("Saving preset name: %s" % name)
-        if name in shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False):
-            if not main_window.m.question("Preset name already exists", "Preset name already exists, overwrite?"):
-                return
-            logging.info("Preset name already exists, overwriting")
+    def getCurrentPreset(self):
         preset = [{}, []]
         # For default stems, we only save whether it is enabled
         for i in range(len(main_window.separator.sources) * 3):
@@ -1426,11 +1416,49 @@ class Mixer(QWidget):
                     self.outputs_table.getCheckState(i),
                 )
             )
+        return preset
+
+    def savePreset(self):
+        name, ok = QInputDialog.getText(self, "Save preset", "Preset name:")
+        if not ok:
+            return
+        if not name:
+            main_window.showError.emit("Preset name cannot be empty", "Preset name cannot be empty")
+            return
+        if name.lower() == "default":
+            main_window.showError.emit('Preset name cannot be "default"', 'Preset name cannot be "default"')
+            return
+        logging.info("Saving preset name: %s" % name)
+        if name in shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False):
+            if not main_window.m.question("Preset name already exists", "Preset name already exists, overwrite?"):
+                return
+            logging.info("Preset name already exists, overwriting")
+        preset = self.getCurrentPreset()
         shared.SetHistory("presets", self.preset_stem_key, name, value=preset)
         logging.info("Preset data:\n%s" % json.dumps(preset, ensure_ascii=False, indent=4))
         self.loadSavedPresets()
 
     def setDefaultPreset(self):
+        if self.getCurrentPreset() != (
+            shared.GetHistory("presets", self.preset_stem_key, self.preset_combobox.currentText(), autoset=False)
+            if self.preset_combobox.currentText() != "Default"
+            else [
+                dict(
+                    sum(
+                        [
+                            [(stem, True), (f"minus_{stem}", False), (f"no_{stem}", False)]
+                            for stem in main_window.separator.sources
+                        ],
+                        [],
+                    )
+                ),
+                [],
+            ]
+        ):
+            main_window.showWarning.emit(
+                "Preset not saved",
+                f"You are not saving your current settings as default, but the preset {self.preset_combobox.currentText()}.",
+            )
         shared.SetHistory("default_preset", self.preset_stem_key, value=self.preset_combobox.currentText())
         logging.info("Set default preset to %s" % self.preset_combobox.currentText())
 
