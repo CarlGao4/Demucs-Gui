@@ -242,7 +242,8 @@ class MainWindow(QMainWindow):
         self.menu_about_usage = Action(
             "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
         )
-        self.menu_clear_history = Action("Clear history", self, self.clear_history)
+        self.menu_clear_history = Action("Clear history (including mixer presets)", self, self.clear_history)
+        self.menu_clear_location = Action("Clear saved file location", self, lambda: shared.ResetHistory("save_location"))
         self.menu_check_update = Action(
             "Check for update",
             self,
@@ -255,6 +256,7 @@ class MainWindow(QMainWindow):
                 self.menu_about_about,
                 self.menu_about_usage,
                 self.menu_clear_history,
+                self.menu_clear_location,
                 self.menu_check_update,
                 self.menu_restart,
                 self.menu_about_log,
@@ -869,13 +871,10 @@ class SaveOptions(QGroupBox):
             self.loc_absolute_path_button.setChecked(True)
         self.loc_input = QComboBox()
         self.loc_input.setEditable(True)
-        self.loc_input.addItems(
-            list(
-                shared.GetHistory(
-                    "save_location", default="separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True
-                )
-            )
-        )
+        locations = list(shared.GetHistory("save_location", default="separated/{model}/{track}/{stem}.{ext}", use_ordered_set=True))
+        if "separated/{model}/{track}/{stem}.{ext}" not in locations:
+            locations.append("separated/{model}/{track}/{stem}.{ext}")
+        self.loc_input.addItems(locations)
         self.loc_input.setCurrentIndex(0)
         self.browse_button = QPushButton()
         self.browse_button.setText("Browse")

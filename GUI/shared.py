@@ -238,10 +238,12 @@ def AddHistory(*attr, value):
 def ResetHistory(*attr):
     global history, historyFile, historyLock
     if not attr:
+        logging.info("Resetting history")
         with historyLock:
             history = {}
         _SaveHistory()
     else:
+        logging.info("Resetting history %s" % str(attr))
         with historyLock:
             _set_to_dict(history, attr, None)
         _SaveHistory()
