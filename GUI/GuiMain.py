@@ -1,4 +1,4 @@
-__version__ = "1.1"
+__version__ = "1.2a1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
@@ -1772,7 +1772,10 @@ if __name__ == "__main__":
     logging.info(
         "System free memory: %d (%s)" % (psutil.virtual_memory().free, shared.HSize(psutil.virtual_memory().free))
     )
-    logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+    try:
+        logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+    except RuntimeError:
+        logging.warning("Swap memory not available")
 
     if sys.platform == "win32":
         import find_device_win
