@@ -323,7 +323,7 @@ class MainWindow(QMainWindow):
             self.separator = separator.Separator(model, repo, self.setStatusText.emit)
         except separator.ModelSourceNameUnsupportedError as e:
             return e
-        except:
+        except Exception:
             logging.error(
                 "Failed to load model %s from %s:\n%s"
                 % (model, ('"' + str(repo) + '"') if repo is not None else "remote repo", traceback.format_exc())
@@ -383,25 +383,26 @@ class MainWindow(QMainWindow):
         self.setStatusText.emit(self._status_text)
 
     def open_log(self):
-        if sys.platform == "win32":
-            os.startfile(str(shared.logfile.resolve()))
-        elif sys.platform == "darwin":
-            os.system(shlex.join(["open", str(shared.logfile.resolve())]))
-        else:
-            try:
-                os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
-            except:
-                if (
-                    self.m.question(
-                        self,
-                        "Open log failed",
-                        "Failed to open log file. Do you want to copy the path?",
-                        self.m.StandardButton.Yes,
-                        self.m.StandardButton.No,
-                    )
-                    == self.m.StandardButton.Yes
-                ):
-                    QApplication.clipboard().setText(str(shared.logfile))
+        match sys.platform:
+            case "win32":
+                os.startfile(str(shared.logfile.resolve()))
+            case "darwin":
+                os.system(shlex.join(["open", str(shared.logfile.resolve())]))
+            case _:
+                try:
+                    os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
+                except Exception:
+                    if (
+                        self.m.question(
+                            self,
+                            "Open log failed",
+                            "Failed to open log file. Do you want to copy the path?",
+                            self.m.StandardButton.Yes,
+                            self.m.StandardButton.No,
+                        )
+                        == self.m.StandardButton.Yes
+                    ):
+                        QApplication.clipboard().setText(str(shared.logfile))
 
     def exec_in_main(self, func):
         with self._execInMainThreadLock:
@@ -765,7 +766,6 @@ class SepParamSettings(QGroupBox):
         self.segment_slider.setOrientation(Qt.Orientation.Horizontal)
         self.segment_slider.setRange(1, int(main_window.separator.default_segment * 10))
         self.segment_slider.setValue(self.segment_slider.maximum())
-        self.segment_slider.setMaximumWidth(360)
         self.segment_slider.valueChanged.connect(lambda value: self.segment_spinbox.setValue(value / 10))
         self.segment_spinbox.valueChanged.connect(lambda value: self.segment_slider.setValue(int(value * 10)))
 
@@ -783,7 +783,6 @@ class SepParamSettings(QGroupBox):
         self.overlap_slider.setOrientation(Qt.Orientation.Horizontal)
         self.overlap_slider.setRange(0, 99)
         self.overlap_slider.setValue(25)
-        self.overlap_slider.setMaximumWidth(360)
         self.overlap_slider.valueChanged.connect(lambda value: self.overlap_spinbox.setValue(value / 100))
         self.overlap_spinbox.valueChanged.connect(lambda value: self.overlap_slider.setValue(int(value * 100)))
 
@@ -803,7 +802,6 @@ class SepParamSettings(QGroupBox):
         self.shifts_slider.setOrientation(Qt.Orientation.Horizontal)
         self.shifts_slider.setRange(0, 20)
         self.shifts_slider.setValue(0)
-        self.shifts_slider.setMaximumWidth(360)
         self.shifts_slider.valueChanged.connect(lambda value: self.shifts_spinbox.setValue(value))
         self.shifts_spinbox.valueChanged.connect(lambda value: self.shifts_slider.setValue(value))
 
@@ -871,6 +869,7 @@ class SaveOptions(QGroupBox):
             self.loc_relative_path_button.setChecked(True)
         else:
             self.loc_absolute_path_button.setChecked(True)
+
         self.loc_input = QComboBox()
         self.loc_input.setEditable(True)
         locations = list(
@@ -883,7 +882,7 @@ class SaveOptions(QGroupBox):
         self.browse_button = QPushButton()
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.browseLocation)
-        self.browse_button.setEnabled(False)
+        self.browse_button.setEnabled(self.location_group.checkedId() == 1)
         self.location_group.idToggled.connect(lambda Id, checked: self.browse_button.setEnabled(not Id ^ checked))
 
         self.clip_mode_label = QLabel()
@@ -893,6 +892,30 @@ class SaveOptions(QGroupBox):
         self.clip_mode.addItems(["rescale", "clamp", "none"])
         self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", default="rescale"))
         self.clip_mode.currentTextChanged.connect(lambda x: shared.SetHistory("clip_mode", value=x))
+
+        self.encoder_selector_label = QLabel()
+        self.encoder_selector_label.setText("Encoder:")
+        self.encoder_selector_label.setToolTip("Select the encoder to use for saving the files")
+
+        self.encoder_group = QButtonGroup()
+        self.encoder_selector_sndfile = QRadioButton()
+        self.encoder_selector_sndfile.setText("libsndfile")
+        self.encoder_selector_ffmpeg = QRadioButton()
+        self.encoder_selector_ffmpeg.setText("ffmpeg")
+        self.encoder_group.addButton(self.encoder_selector_sndfile, 0)
+        self.encoder_group.addButton(self.encoder_selector_ffmpeg, 1)
+        self.encoder_group.idClicked.connect(self.switchEncoder)
+        self.encoder_group.button(shared.GetHistory("encoder", default=0)).setChecked(True)
+
+        self.encoder_sndfile_box = QWidget()
+        self.encoder_sndfile_layout = QGridLayout()
+        self.encoder_sndfile_layout.setContentsMargins(0, 0, 0, 0)
+        self.encoder_sndfile_box.setLayout(self.encoder_sndfile_layout)
+
+        self.encoder_ffmpeg_box = QWidget()
+        self.encoder_ffmpeg_layout = QGridLayout()
+        self.encoder_ffmpeg_layout.setContentsMargins(0, 0, 0, 0)
+        self.encoder_ffmpeg_box.setLayout(self.encoder_ffmpeg_layout)
 
         self.file_format_label = QLabel()
         self.file_format_label.setText("File format:")
@@ -912,6 +935,67 @@ class SaveOptions(QGroupBox):
         self.sample_fmt.setCurrentText(shared.GetHistory("sample_fmt", default="int16"))
         self.sample_fmt.currentTextChanged.connect(lambda x: shared.SetHistory("sample_fmt", value=x))
 
+        self.preset_selector_label = QLabel()
+        self.preset_selector_label.setText("Preset:")
+        self.preset_selector_label.setToolTip("Select the command line preset to use for ffmpeg")
+
+        self.preset_selector = QComboBox()
+        self.preset_selector.currentIndexChanged.connect(self.switchFFmpegPreset)
+        self.preset_selector.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.preset_selector.addItem(
+            "MP3", {"command": "ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}", "ext": "mp3"}
+        )
+        self.preset_selector.addItem(
+            "AAC", {"command": "ffmpeg -y -v level+warning -i - -c:a aac -b:a 320k {output}", "ext": "m4a"}
+        )
+        self.preset_selector.addItem(
+            "Copy video stream",
+            {
+                "command": "ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} "
+                "-map 1:v -map 0:a -c:v copy {output}",
+                "ext": "{inputext}",
+            },
+        )
+        self.preset_selector.setCurrentIndex(0)
+
+        self.file_extension_label = QLabel()
+        self.file_extension_label.setText("File extension:")
+        self.file_extension_label.setToolTip("File extension to use for the saved files")
+
+        self.file_extension = QLineEdit()
+        self.file_extension.setText("mp3")
+        self.file_extension.setFixedWidth(80)
+
+        self.command_label = QLabel()
+        self.command_label.setText("Command:")
+        self.command_label.setToolTip("Command to use for saving the files")
+
+        self.command = QLineEdit()
+        self.command.textChanged.connect(self.showParsedCommand)
+
+        self.command_help_button = QPushButton()
+        self.command_help_button.setText("Help")
+        self.command_help_button.clicked.connect(
+            lambda: main_window.showInfo.emit("Command syntax help", shared.command_syntax)
+        )
+
+        self.preset_save_button = QPushButton()
+        self.preset_save_button.setText("Save")
+        # self.preset_save_button.clicked.connect(self.savePreset)  # TODO
+
+        self.remove_preset_button = QPushButton()
+        self.remove_preset_button.setText("Remove")
+        # self.remove_preset_button.clicked.connect(self.removePreset)  # TODO
+
+        self.set_default_button = QPushButton()
+        self.set_default_button.setText("Set default")
+        # self.set_default_button.clicked.connect(self.setDefault)  # TODO
+
+        self.encoder_ffmpeg_buttons_layout = QHBoxLayout()
+
+        self.parsed_command = QLabel()
+        self.parsed_command.setWordWrap(True)
+
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
@@ -926,13 +1010,34 @@ class SaveOptions(QGroupBox):
         self.widget_layout.addWidget(line, 3, 0, 1, 3)
         self.widget_layout.addWidget(self.clip_mode_label, 4, 0, 1, 2)
         self.widget_layout.addWidget(self.clip_mode, 4, 2)
-        self.widget_layout.addWidget(self.file_format_label, 5, 0, 1, 2)
+        self.encoder_sndfile_layout.addWidget(self.file_format_label, 0, 0, 1, 2)
+        self.encoder_sndfile_layout.addWidget(self.file_format, 0, 2)
+        self.encoder_sndfile_layout.addWidget(self.sample_fmt_label, 1, 0, 1, 2)
+        self.encoder_sndfile_layout.addWidget(self.sample_fmt, 1, 2)
+        self.encoder_ffmpeg_layout.addWidget(self.preset_selector_label, 0, 0)
+        self.encoder_ffmpeg_layout.addWidget(self.preset_selector, 0, 1)
+        self.encoder_ffmpeg_layout.addWidget(self.file_extension_label, 0, 2)
+        self.encoder_ffmpeg_layout.addWidget(self.file_extension, 0, 3)
+        self.encoder_ffmpeg_layout.addWidget(self.command_label, 1, 0)
+        self.encoder_ffmpeg_layout.addWidget(self.command, 1, 1, 1, 3)
+        self.encoder_ffmpeg_buttons_layout.addWidget(self.command_help_button)
         self.widget_layout.addWidget(self.file_format, 5, 2)
         self.widget_layout.addWidget(self.sample_fmt_label, 6, 0, 1, 2)
         self.widget_layout.addWidget(self.sample_fmt, 6, 2)
+        self.encoder_ffmpeg_layout.addLayout(self.encoder_ffmpeg_buttons_layout, 2, 0, 1, 4)
+        self.encoder_ffmpeg_layout.addWidget(self.parsed_command, 3, 0, 1, 4)
 
         self.setLayout(self.widget_layout)
+        self.switchFFmpegPreset(0)
 
+        if separator.audio.ffmpeg_available:
+            self.widget_layout.addWidget(self.encoder_selector_label, 5, 0)
+            self.widget_layout.addWidget(self.encoder_selector_sndfile, 5, 1)
+            self.widget_layout.addWidget(self.encoder_selector_ffmpeg, 5, 2)
+            self.switchEncoder(shared.GetHistory("encoder", default=0))
+        else:
+            self.encoder_group.button(0).setChecked(True)
+            self.widget_layout.addWidget(self.encoder_sndfile_box, 6, 0, 1, 3)
         self.saving = 0
 
     def browseLocation(self):
@@ -940,39 +1045,99 @@ class SaveOptions(QGroupBox):
         if p:
             self.loc_input.setCurrentText(p)
 
+    def switchEncoder(self, Id):
+        shared.SetHistory("encoder", value=Id)
+        self.encoder_sndfile_box.hide()
+        self.encoder_ffmpeg_box.hide()
+        match Id:
+            case 0:
+                self.widget_layout.addWidget(self.encoder_sndfile_box, 6, 0, 1, 3)
+                self.encoder_sndfile_box.show()
+            case 1:
+                self.widget_layout.addWidget(self.encoder_ffmpeg_box, 6, 0, 1, 3)
+                self.encoder_ffmpeg_box.show()
+
     @shared.thread_wrapper(daemon=True)
-    def save(self, file, origin, tensor, save_func, item, finishCallback):
+    def save(self, file: pathlib.Path, origin, tensor, save_func, item, finishCallback):
+        global main_window
         self.saving += 1
         main_window.mixer.setEnabled(False)
         finishCallback(shared.FileStatus.Writing, item)
         shared.AddHistory("save_location", value=self.loc_input.currentText())
         for stem, stem_data in main_window.mixer.mix(origin, tensor):
+            match self.encoder_group.checkedId():
+                case 0:
+                    file_ext = self.file_format.currentText()
+                case 1:
+                    file_ext = self.file_extension.text()
+                case _:
+                    file_ext = "wav"
             file_path_str = self.loc_input.currentText().format(
                 track=file.stem,
                 trackext=file.name,
                 stem=stem,
-                ext=self.file_format.currentText(),
+                ext=file_ext,
                 model=main_window.model_selector.select_combobox.currentText(),
             )
-            if self.location_group.checkedId() == 0:
-                file_path = file.parent / file_path_str
-            else:
-                file_path = pathlib.Path(file_path_str)
-            if self.clip_mode.currentText() == "rescale":
-                if (peak := stem_data.abs().max()) > 0.999:
-                    data = stem_data / peak * 0.999
-                else:
+            match self.location_group.checkedId():
+                case 0:
+                    file_path = file.parent / file_path_str
+                case 1:
+                    file_path = pathlib.Path(file_path_str)
+            match self.clip_mode.currentText():
+                case "rescale":
+                    if (peak := stem_data.abs().max()) > 0.999:
+                        data = stem_data / peak * 0.999
+                    else:
+                        data = stem_data
+                case "clamp":
+                    data = stem_data.clamp(-0.999, 0.999)
+                case "none":
                     data = stem_data
-            elif self.clip_mode.currentText() == "clamp":
-                data = stem_data.clamp(-0.999, 0.999)
-            else:
-                data = stem_data
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            save_func(file_path, data, self.sample_fmt.currentData())
+            try:
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                match self.encoder_group.checkedId():
+                    case 0:
+                        ret = save_func(file_path, data, self.sample_fmt.currentData(), encoder="sndfile")
+                    case 1:
+                        command = [
+                            i.format(
+                                input=file.stem,
+                                inputext=file.suffix[1:],
+                                inputpath=str(file.parent),
+                                output=str(file_path),
+                            ).format(
+                                input=file.stem,
+                                inputext=file.suffix[1:],
+                                inputpath=str(file.parent),
+                                output=str(file_path),
+                            )
+                            for i in shared.try_parse_cmd(self.command.text())
+                        ]
+                        logging.info("Saving file %s with command %s" % (file_path, command))
+                        ret = save_func(command, data, encoder="ffmpeg")
+            except Exception:
+                logging.error("Failed to save file %s:\n%s" % (file_path, traceback.format_exc()))
+                ret = False
+            if ret is not None:
+                break
         self.saving -= 1
         if self.saving == 0:
             main_window.mixer.setEnabled(True)
-        finishCallback(shared.FileStatus.Finished, item)
+        if ret is None:
+            finishCallback(shared.FileStatus.Finished, item)
+        else:
+            finishCallback(shared.FileStatus.Failed, item)
+
+    def showParsedCommand(self, command: str):
+        if command and (parsed := shared.try_parse_cmd(command)):
+            self.parsed_command.setText("Parsed command:\n%s" % parsed)
+        else:
+            self.parsed_command.setText("Parsed command:\nInvalid command")
+
+    def switchFFmpegPreset(self, index):
+        self.file_extension.setText(self.preset_selector.currentData()["ext"])
+        self.command.setText(self.preset_selector.currentData()["command"])
 
 
 class FileQueue(QWidget):
@@ -1128,10 +1293,11 @@ class FileQueue(QWidget):
                 main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
-        if index == 0:
-            self.togglePathName()
-        elif index == 1:
-            self.toggleAnimation()
+        match index:
+            case 0:
+                self.togglePathName()
+            case 1:
+                self.toggleAnimation()
 
     def toggleAnimation(self, first=False):
         animation = shared.GetSetting("file_list_animation", False)
@@ -1457,7 +1623,8 @@ class Mixer(QWidget):
         ):
             main_window.showWarning.emit(
                 "Preset not saved",
-                f"You are not saving your current settings as default, but the preset {self.preset_combobox.currentText()}.",
+                "You are not saving your current settings as default, but the preset "
+                f"{self.preset_combobox.currentText()}.",
             )
         shared.SetHistory("default_preset", self.preset_stem_key, value=self.preset_combobox.currentText())
         logging.info("Set default preset to %s" % self.preset_combobox.currentText())
@@ -1642,10 +1809,11 @@ class SeparationControl(QWidget):
 
     def setStatusForItem(self, status, item: QTableWidgetItem):
         item.setData(Qt.ItemDataRole.UserRole, [status])
-        if status == shared.FileStatus.Reading:
-            item.setData(ProgressDelegate.TextRole, "Reading")
-        elif status == shared.FileStatus.Writing:
-            item.setData(ProgressDelegate.TextRole, "Writing")
+        match status:
+            case shared.FileStatus.Reading:
+                item.setData(ProgressDelegate.TextRole, "Reading")
+            case shared.FileStatus.Writing:
+                item.setData(ProgressDelegate.TextRole, "Writing")
 
     def currentFinished(self, status, item: QTableWidgetItem):
         match status:
@@ -1681,9 +1849,22 @@ class SeparationControl(QWidget):
             return
         if "{stem}" not in main_window.save_options.loc_input.currentText():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
+        if main_window.save_options.encoder_group.checkedId() == 1:
+            if not shared.is_sublist(["-i", "-"], shared.try_parse_cmd(main_window.save_options.command.text())):
+                main_window.showError.emit(
+                    "Invalid command",
+                    'Command must contain "-i -" for ffmpeg encoder. You are not saving output audio.',
+                )
+                return
+            if "-v" not in shared.try_parse_cmd(main_window.save_options.command.text()):
+                main_window.showWarning.emit(
+                    "Warning",
+                    'Command does not contain "-v" for ffmpeg encoder. May output too much information to log file.',
+                )
         self.start_button.setEnabled(False)
         if (index := main_window.file_queue.getFirstQueued()) is None:
             self.start_button.setEnabled(True)
+            main_window.save_options.encoder_ffmpeg_box.setEnabled(True)
             main_window.setStatusText.emit("No more file to separate")
             separator.empty_cuda_cache()
             return
@@ -1692,6 +1873,7 @@ class SeparationControl(QWidget):
         item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Separating])
         item.setData(ProgressDelegate.ProgressRole, 0)
         item.setData(ProgressDelegate.TextRole, "")
+        main_window.save_options.encoder_ffmpeg_box.setEnabled(False)
         main_window.separator.startSeparate(
             file,
             item,
@@ -1744,13 +1926,13 @@ if __name__ == "__main__":
                 format="%(asctime)s (%(filename)s) (Line %(lineno)d) [%(levelname)s] : %(message)s",
                 level=logging.DEBUG,
             )
-        except:
+        except Exception:
             logging.basicConfig(
                 handlers=[handler],
                 format="%(asctime)s (%(filename)s) (Line %(lineno)d) [%(levelname)s] : %(message)s",
                 level=logging.DEBUG,
             )
-    except:
+    except Exception:
         print(traceback.format_exc())
         app = QApplication([])
         msgbox = QMessageBox()
@@ -1773,7 +1955,9 @@ if __name__ == "__main__":
         "System free memory: %d (%s)" % (psutil.virtual_memory().free, shared.HSize(psutil.virtual_memory().free))
     )
     try:
-        logging.info("System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total)))
+        logging.info(
+            "System swap memory: %d (%s)" % (psutil.swap_memory().total, shared.HSize(psutil.swap_memory().total))
+        )
     except RuntimeError:
         logging.warning("Swap memory not available")
 

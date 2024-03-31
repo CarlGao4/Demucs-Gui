@@ -63,7 +63,7 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
         except ModuleNotFoundError:
             logging.info("Intel Extension for PyTorch is not installed")
             break
-        except:
+        except Exception:
             logging.error(
                 "Failed to load Intel Extension for PyTorch for the %d time:\n" % (i + 1) + traceback.format_exc()
             )
@@ -172,14 +172,14 @@ def autoListModels():
         torch.hub.set_dir(shared.model_cache)
         checkpoint_dir = shared.model_cache / "checkpoints"
         downloaded_models = demucs.api.list_models(checkpoint_dir)["single"]
-    except:
+    except Exception:
         logging.error("Failed to list downloaded models:\n%s" % traceback.format_exc())
     for repopath in repos:
         if repopath is not None and not repopath.exists():
             continue
         try:
             new_models = demucs.api.list_models(repopath)
-        except:
+        except Exception:
             logging.error("Failed to list models from %s:\n%s" % (str(repopath), traceback.format_exc()))
             continue
         for sig, filepath in new_models["bag"].items():
@@ -208,7 +208,7 @@ def autoListModels():
                             info += " (Downloaded)" if model in downloaded_models else " (Not downloaded)"
                 if "segment" in model_def:
                     info += "\nDefault segment: %.1f" % model_def["segment"]
-            except:
+            except Exception:
                 logging.error("Failed to load info of model %s:\n%s" % (sig, traceback.format_exc()))
             else:
                 remote_urls[sig] = model_def["models"]
@@ -425,8 +425,12 @@ class Separator:
         pause_end = time.time()
         self.time_hists = [(i[0] + pause_end - pause_start, i[1]) for i in self.time_hists]
 
-    def save_callback(self, *args):
-        audio.save_audio(*args, self.separator.samplerate, self.updateStatus)
+    def save_callback(self, *args, encoder="sndfile"):
+        match encoder:
+            case "sndfile":
+                return audio.save_audio_sndfile(*args, self.separator.samplerate, self.updateStatus)
+            case "ffmpeg":
+                return audio.save_audio_ffmpeg(*args, self.separator.samplerate, self.updateStatus)
 
     @shared.thread_wrapper(daemon=True)
     def separate(
@@ -453,7 +457,7 @@ class Separator:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
             assert wav is not None
-        except:
+        except Exception:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
             return
@@ -495,7 +499,7 @@ class Separator:
             finishCallback(shared.FileStatus.Cancelled, item)
             self.separating = False
             return
-        except:
+        except Exception:
             logging.error(traceback.format_exc())
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False

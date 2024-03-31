@@ -57,7 +57,7 @@ def checkFFMpeg():
         ffmpeg_available = True
         format_filter += ";;All types (*.*)"
         return ffmpeg_version
-    except:
+    except Exception:
         logging.warning("FFMpeg cannot start:\n" + traceback.format_exc())
         return False
 
@@ -66,12 +66,12 @@ def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = l
     logging.debug("Reading audio with soundfile: %s" % file)
     try:
         return read_audio_soundfile(file, target_sr, update_status)
-    except:
+    except Exception:
         logging.error("Failed to read with soundfile:\n" + traceback.format_exc())
     logging.debug("Reading audio with ffmpeg: %s" % file)
     try:
         return read_audio_ffmpeg(file, target_sr, update_status)
-    except:
+    except Exception:
         logging.error("Failed to read with ffmpeg:\n" + traceback.format_exc())
 
 
@@ -118,12 +118,37 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     return audio
 
 
-def save_audio(file, audio, format, sr, update_status: tp.Callable[[str], None] = lambda _: None):
+def save_audio_sndfile(file, audio, smp_fmt, sr, update_status: tp.Callable[[str], None] = lambda _: None):
     if callable(update_status):
         update_status(f"Saving audio: {file.name}")
     try:
-        soundfile.write(file, audio.transpose(0, 1).numpy(), sr, format)
+        soundfile.write(file, audio.transpose(0, 1).numpy(), sr, subtype=smp_fmt)
     except soundfile.LibsndfileError:
         logging.error(f"Failed to write file {file}:\n" + traceback.format_exc())
-        return
+        return False
     logging.info(f"Saved audio {file}: shape={audio.shape}")
+    return
+
+
+def save_audio_ffmpeg(command, audio, sr, update_status: tp.Callable[[str], None] = lambda _: None):
+    if not ffmpeg_available:
+        raise NotImplementedError("FFmpeg is not available")
+    if callable(update_status):
+        update_status(f"Saving audio: {command[-1]}")
+    try:
+        p = shared.Popen(command)
+        logging.debug(f"ffmpeg command: {command}")
+        wav = io.BytesIO()
+        soundfile.write(wav, audio.transpose(0, 1).numpy(), sr, format="WAV", subtype="FLOAT")
+        wav.seek(0)
+        ffmpeg_output, ffmpeg_log = p.communicate(wav.read())
+    except Exception:
+        logging.error("Failed to run ffmpeg command:\n" + traceback.format_exc())
+        return False
+    del wav, ffmpeg_output
+    if ffmpeg_log:
+        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode())
+    if p.returncode != 0:
+        logging.error(f"FFmpeg failed with code {p.returncode}")
+        return False
+    return

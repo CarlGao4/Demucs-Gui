@@ -28,6 +28,7 @@ import lzma
 import ordered_set
 import pathlib
 import pickle
+import shlex
 import subprocess
 import sys
 import threading
@@ -49,9 +50,10 @@ if not (homeDir.parent / ".git").exists():
 else:
     debug = True  # Disable log file if running from source
 
-save_loc_syntax = """You can use variables to rename your output file.
+save_loc_syntax = """\
+You can use variables to rename your output file.
 Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
-track extension, stem name, default output file extension and model name.
+track name with extension, stem name, default output file extension and model name.
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default \
 location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/audio/vocals.flac", with the folder \
@@ -59,6 +61,23 @@ location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/a
 
 Please remember that absolute path must start from the root dir (like "C:\\xxx" on Windows or "/xxx" on macOS and \
 Linux) in case something unexpected would happen."""
+
+command_syntax = """\
+You can use FFmpeg to encode output audio files instead of the internal libsndfile.
+
+The separated audio data will be piped to FFmpeg's stdin and the output file will be created by FFmpeg. FFmpeg stdout \
+will be ignored and stderr will be logged to the log file.
+Data passed to FFmpeg is in wav format, encoded with float32 sample format. So if you want to change the format, \
+please manually add "-sample_fmt" option to the command. e.g. "-sample_fmt s16" for 16-bit signed integer.
+
+There are also some variables you can use in the command. Your command will be splitted to argument list by \
+shlex.split (Unix-like shell syntax), then the variables will be replaced with the corresponding values. \
+Available variables:
+- {input}: input file name without extension
+- {inputext}: input file extension
+- {inputpath}: input file path (without file name)
+- {output}: output file full path
+Variables above will be replaced twice so you can use them in save location and file extension."""
 
 update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
 
@@ -76,6 +95,27 @@ def HSize(size):
         if t >= 6:
             break
     return ("%.3f" % s).rstrip("0").rstrip(".") + u[t]
+
+
+def is_sublist(a, b):
+    if not isinstance(a, list):
+        a = list(a)
+    if not isinstance(b, list):
+        b = list(b)
+    if not a:
+        return True
+    if not b:
+        return False
+    if a[0] == b[0]:
+        return is_sublist(a[1:], b[1:])
+    return is_sublist(a, b[1:])
+
+
+def try_parse_cmd(cmd):
+    try:
+        return shlex.split(cmd)
+    except Exception:
+        return []
 
 
 def InitializeFolder():
@@ -101,7 +141,7 @@ def InitializeFolder():
                 settings = json.loads(settings_data)
             if type(settings) is not dict:
                 raise TypeError
-        except:
+        except Exception:
             print("Settings file is corrupted, reset to default", file=sys.stderr)
             print("Error message:\n%s" % traceback.format_exc(), file=sys.stderr)
             print("Settings file content:\n%s" % settings_data, file=sys.stderr)
@@ -114,7 +154,7 @@ def InitializeFolder():
                 history = pickle.loads(lzma.decompress(f.read()))
             if type(history) is not dict:
                 raise TypeError
-        except:
+        except Exception:
             print("History file is corrupted, reset to default", file=sys.stderr)
             print("Error message:\n%s" % traceback.format_exc(), file=sys.stderr)
             history = {}
@@ -142,7 +182,7 @@ def SetSetting(attr, value):
             settings_write_data = json.dumps(settings, separators=(",", ":"))
             with open(str(settingsFile), mode="wt", encoding="utf8") as f:
                 f.write(settings_write_data)
-        except:
+        except Exception:
             logging.warning("Failed to save settings:\n%s" % traceback.format_exc())
 
 
@@ -190,7 +230,7 @@ def _SaveHistory():
             history_write_data = lzma.compress(pickle.dumps(history), preset=7)
             with open(str(historyFile), mode="wb") as f:
                 f.write(history_write_data)
-        except:
+        except Exception:
             logging.warning("Failed to save history:\n%s" % traceback.format_exc())
 
 
@@ -293,7 +333,7 @@ def thread_wrapper(*args_thread, **kw_thread):
                 )
                 try:
                     func(*args, **kwargs)
-                except:
+                except Exception:
                     logging.error(
                         "[%d] Thread %s (%s) failed:\n%s"
                         % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name, traceback.format_exc())
@@ -320,6 +360,6 @@ def checkUpdate(callback):
             data = json.loads(f.read())[0]
         logging.info("Latest version: %s" % data["tag_name"])
         callback(data["tag_name"])
-    except:
+    except Exception:
         logging.warning("Failed to check for updates:\n%s" % traceback.format_exc())
         callback(None)
