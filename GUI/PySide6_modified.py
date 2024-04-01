@@ -18,11 +18,12 @@ import shared
 
 if not shared.use_PyQt6:
     from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt
-    from PySide6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator
+    from PySide6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator, QTextOption
     from PySide6.QtWidgets import (
         QApplication,
         QLabel,
         QLineEdit,
+        QPlainTextEdit,
         QSizePolicy,
         QSpinBox,
         QStyle,
@@ -38,11 +39,12 @@ if not shared.use_PyQt6:
     )
 else:
     from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt  # type: ignore
-    from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator  # type: ignore
+    from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator, QTextOption  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
         QLabel,
         QLineEdit,
+        QPlainTextEdit,
         QSizePolicy,
         QSpinBox,
         QStyle,
@@ -59,6 +61,7 @@ else:
 
 from typing import Callable, Union
 
+import math
 import sys
 import warnings
 
@@ -67,13 +70,12 @@ warnings.filterwarnings("ignore", category=NotImplementedWarning)
 
 
 # Modified so that text can be wrapped everywhere
-class ModifiedQLabel(QLabel):
+class TextWrappedQLabel(QLabel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.textalignment = Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWrapAnywhere
         self.isTextLabel = True
-        self.align = None
         self.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         self._minimum_height = 0
 
@@ -97,8 +99,48 @@ class ModifiedQLabel(QLabel):
     def sizeHint(self):
         return QSize(self.width(), max(self._minimum_height, self.heightForWidth(self.width())))
 
+    def minimumSizeHint(self):
+        return QSize(0, 0)
+
     def resizeEvent(self, event):
         self.updateGeometry()
+
+
+class ExpandingQPlainTextEdit(QPlainTextEdit):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred))
+
+    def sizeHint(self):
+        metrics = QFontMetrics(self.document().defaultFont())
+        rect = metrics.boundingRect(
+            0,
+            0,
+            0,
+            0,
+            Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWrapAnywhere,
+            "\n".join(["M"] * math.ceil(self.document().size().height())),
+        )
+        total_height = int(
+            rect.height()
+            + self.contentsMargins().top()
+            + self.contentsMargins().bottom()
+            + self.viewport().contentsMargins().top()
+            + self.viewport().contentsMargins().bottom()
+            + 2 * self.frameWidth()
+            + 2 * self.document().documentMargin()
+        )
+        if self.horizontalScrollBar().isVisible():
+            total_height += self.horizontalScrollBar().height()
+        return QSize(self.width(), total_height)
+
+    def minimumSizeHint(self):
+        return QSize(0, self.sizeHint().height())
+
+    def resizeEvent(self, event):
+        self.updateGeometry()
+        return super().resizeEvent(event)
 
 
 class DelegateCombiner(QStyledItemDelegate):

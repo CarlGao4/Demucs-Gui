@@ -120,11 +120,12 @@ import separator
 from PySide6_modified import (
     Action,
     DelegateCombiner,
-    ModifiedQLabel,
+    ExpandingQPlainTextEdit,
     FileNameDelegate,
     PercentSpinBoxDelegate,
     ProgressDelegate,
     QTableWidgetWithCheckBox,
+    TextWrappedQLabel,
 )
 
 file_queue_lock = threading.Lock()
@@ -301,6 +302,7 @@ class MainWindow(QMainWindow):
     def showParamSettingsFunc(self):
         self.param_settings = SepParamSettings()
         self.save_options = SaveOptions()
+        self.param_settings.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.options_tab = QWidget()
         self.options_tab.setLayout(QVBoxLayout())
         self.options_tab.layout().addWidget(self.param_settings)
@@ -575,7 +577,7 @@ class ModelSelector(QWidget):
         self.select_combobox.setMinimumWidth(240)
         self.select_combobox.currentIndexChanged.connect(self.updateModelInfo)
 
-        self.model_info = ModifiedQLabel()
+        self.model_info = TextWrappedQLabel()
         self.model_info.setMinimumHeight(160)
         self.model_info.setWordWrap(True)
         self.model_info.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -940,38 +942,27 @@ class SaveOptions(QGroupBox):
         self.preset_selector_label.setToolTip("Select the command line preset to use for ffmpeg")
 
         self.preset_selector = QComboBox()
-        self.preset_selector.currentIndexChanged.connect(self.switchFFmpegPreset)
         self.preset_selector.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.preset_selector.addItem(
-            "MP3", {"command": "ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}", "ext": "mp3"}
-        )
-        self.preset_selector.addItem(
-            "AAC", {"command": "ffmpeg -y -v level+warning -i - -c:a aac -b:a 320k {output}", "ext": "m4a"}
-        )
-        self.preset_selector.addItem(
-            "Copy video stream",
-            {
-                "command": "ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} "
-                "-map 1:v -map 0:a -c:v copy {output}",
-                "ext": "{inputext}",
-            },
-        )
-        self.preset_selector.setCurrentIndex(0)
+        self.loadPresets()
+        self.preset_selector.setCurrentText(shared.GetHistory("ffmpeg_default_preset", default="MP3"))
+        self.preset_selector.currentIndexChanged.connect(self.switchFFmpegPreset)
 
         self.file_extension_label = QLabel()
         self.file_extension_label.setText("File extension:")
         self.file_extension_label.setToolTip("File extension to use for the saved files")
 
         self.file_extension = QLineEdit()
-        self.file_extension.setText("mp3")
         self.file_extension.setFixedWidth(80)
 
         self.command_label = QLabel()
         self.command_label.setText("Command:")
         self.command_label.setToolTip("Command to use for saving the files")
 
-        self.command = QLineEdit()
+        self.command = ExpandingQPlainTextEdit()
         self.command.textChanged.connect(self.showParsedCommand)
+        self.command.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.command.setWordWrapMode(QtGui.QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.command_label.setContentsMargins(0, self.command.document().documentMargin(), 0, 0)
 
         self.command_help_button = QPushButton()
         self.command_help_button.setText("Help")
@@ -981,20 +972,22 @@ class SaveOptions(QGroupBox):
 
         self.preset_save_button = QPushButton()
         self.preset_save_button.setText("Save")
-        # self.preset_save_button.clicked.connect(self.savePreset)  # TODO
+        self.preset_save_button.clicked.connect(self.savePreset)
 
         self.remove_preset_button = QPushButton()
         self.remove_preset_button.setText("Remove")
-        # self.remove_preset_button.clicked.connect(self.removePreset)  # TODO
+        self.remove_preset_button.clicked.connect(self.removePreset)
 
         self.set_default_button = QPushButton()
         self.set_default_button.setText("Set default")
-        # self.set_default_button.clicked.connect(self.setDefault)  # TODO
+        self.set_default_button.clicked.connect(self.setDefault)
 
         self.encoder_ffmpeg_buttons_layout = QHBoxLayout()
 
-        self.parsed_command = QLabel()
+        self.parsed_command = TextWrappedQLabel()
         self.parsed_command.setWordWrap(True)
+        self.parsed_command.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.parsed_command.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -1018,17 +1011,16 @@ class SaveOptions(QGroupBox):
         self.encoder_ffmpeg_layout.addWidget(self.preset_selector, 0, 1)
         self.encoder_ffmpeg_layout.addWidget(self.file_extension_label, 0, 2)
         self.encoder_ffmpeg_layout.addWidget(self.file_extension, 0, 3)
-        self.encoder_ffmpeg_layout.addWidget(self.command_label, 1, 0)
+        self.encoder_ffmpeg_layout.addWidget(self.command_label, 1, 0, Qt.AlignmentFlag.AlignTop)
         self.encoder_ffmpeg_layout.addWidget(self.command, 1, 1, 1, 3)
         self.encoder_ffmpeg_buttons_layout.addWidget(self.command_help_button)
-        self.widget_layout.addWidget(self.file_format, 5, 2)
-        self.widget_layout.addWidget(self.sample_fmt_label, 6, 0, 1, 2)
-        self.widget_layout.addWidget(self.sample_fmt, 6, 2)
+        self.encoder_ffmpeg_buttons_layout.addWidget(self.preset_save_button)
+        self.encoder_ffmpeg_buttons_layout.addWidget(self.remove_preset_button)
+        self.encoder_ffmpeg_buttons_layout.addWidget(self.set_default_button)
         self.encoder_ffmpeg_layout.addLayout(self.encoder_ffmpeg_buttons_layout, 2, 0, 1, 4)
         self.encoder_ffmpeg_layout.addWidget(self.parsed_command, 3, 0, 1, 4)
 
         self.setLayout(self.widget_layout)
-        self.switchFFmpegPreset(0)
 
         if separator.audio.ffmpeg_available:
             self.widget_layout.addWidget(self.encoder_selector_label, 5, 0)
@@ -1038,6 +1030,7 @@ class SaveOptions(QGroupBox):
         else:
             self.encoder_group.button(0).setChecked(True)
             self.widget_layout.addWidget(self.encoder_sndfile_box, 6, 0, 1, 3)
+        self.switchFFmpegPreset()
         self.saving = 0
 
     def browseLocation(self):
@@ -1129,15 +1122,92 @@ class SaveOptions(QGroupBox):
         else:
             finishCallback(shared.FileStatus.Failed, item)
 
-    def showParsedCommand(self, command: str):
+    def loadPresets(self):
+        self.preset_selector.clear()
+        self.preset_selector.addItem(
+            "MP3", {"command": "ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}", "ext": "mp3"}
+        )
+        self.preset_selector.addItem(
+            "AAC", {"command": "ffmpeg -y -v level+warning -i - -c:a aac -b:a 320k {output}", "ext": "m4a"}
+        )
+        self.preset_selector.addItem(
+            "Copy video stream",
+            {
+                "command": "ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} "
+                "-map 1:v -map 0:a -c:v copy {output}",
+                "ext": "{inputext}",
+            },
+        )
+        for name, preset in shared.GetHistory("ffmpeg_presets", default={}).items():
+            self.preset_selector.addItem(name, preset)
+
+    def savePreset(self):
+        name, ok = QInputDialog.getText(self, "Save preset", "Enter a name for the preset")
+        if not ok:
+            return
+        if name.lower() in {"mp3", "aac", "copy video stream"}:
+            self.m.warning(self, "Invalid name", "Name cannot be 'MP3', 'AAC' or 'Copy video stream'.")
+            return
+        if name in shared.GetHistory("ffmpeg_presets", default={}):
+            if (
+                self.m.question(
+                    self,
+                    "Overwrite preset",
+                    "Preset '%s' already exists. Overwrite?" % name,
+                    self.m.StandardButton.Yes,
+                    self.m.StandardButton.No,
+                )
+                == self.m.StandardButton.No
+            ):
+                return
+        logging.info("Save preset %s:\ncommand: %s\next: %s" % (name, self.command.text(), self.file_extension.text()))
+        shared.AddHistory("ffmpeg_presets", name, value={"command": self.command.text(), "ext": self.file_extension.text()})
+
+    def removePreset(self):
+        name = self.preset_selector.currentText()
+        if name.lower() in {"mp3", "aac", "copy video stream"}:
+            self.m.warning(self, "Invalid name", "Cannot remove built-in presets.")
+            return
+        if (
+            self.m.question(
+                self,
+                "Remove preset",
+                "Remove preset '%s'?" % name,
+                self.m.StandardButton.Yes,
+                self.m.StandardButton.No,
+            )
+            == self.m.StandardButton.No
+        ):
+            return
+        logging.info("Remove preset %s" % name)
+        shared.RemoveHistory("ffmpeg_presets", name)
+
+    def setDefault(self):
+        preset = self.preset_selector.currentText()
+        preset_data = self.preset_selector.currentData()
+        if preset_data["command"] != self.command.text() or preset_data["ext"] != self.file_extension.text():
+            main_window.showWarning.emit(
+                "Set default preset",
+                "Your current settings are different from the preset settings. If you want to set your current "
+                "settings as the default, please save it first."
+            )
+        shared.SetHistory("ffmpeg_default_preset", value=preset)
+
+    def showParsedCommand(self):
+        command = self.command.toPlainText()
+        if "\r" in command or "\n" in command:
+            self.command.setPlainText(command.replace("\r", "").replace("\n", ""))
+            return
         if command and (parsed := shared.try_parse_cmd(command)):
             self.parsed_command.setText("Parsed command:\n%s" % parsed)
         else:
             self.parsed_command.setText("Parsed command:\nInvalid command")
 
-    def switchFFmpegPreset(self, index):
+    def switchFFmpegPreset(self, index=None):
+        if self.preset_selector.currentData() is None:
+            self.preset_selector.setCurrentIndex(0)
         self.file_extension.setText(self.preset_selector.currentData()["ext"])
-        self.command.setText(self.preset_selector.currentData()["command"])
+        self.command.setPlainText(self.preset_selector.currentData()["command"])
 
 
 class FileQueue(QWidget):
@@ -1644,7 +1714,7 @@ class Mixer(QWidget):
             == QMessageBox.StandardButton.No
         ):
             return
-        logging.info("Deleting preset %s" % wait_for_delete)
+        logging.info("Delete preset %s" % wait_for_delete)
         shared.ResetHistory("presets", self.preset_stem_key, wait_for_delete)
         self.loadSavedPresets()
 
