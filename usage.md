@@ -84,16 +84,6 @@ You can save the current mixer settings as a preset. The same preset can be used
 
 You can also set a preset as default. The default preset will be loaded when you load a model with same stems. When you click on "Save as default" button, the preset selected in the dropdown list will be set as default, but not the current settings. To save the current settings as default, you should first save it as a preset, then set it as default.
 
-### Some "useless" functions of separation queue
-
-1. You can drag and drop files to the queue to add them. (It's quite useful, isn't it?) But one thing is not supported: You can't drag a file or a folder from Windows to the application ran in WSL.
-
-2. You can click on the header `File` to show full file path or file name. Hover on an item in the queue to show its full path.
-
-3. On Windows, the progress bar should have animation. However, rendering a lot of progress bars at the same time (like the queue) will consume a lot of CPU resources. So, the animation is disabled in the queue (animation will still be rendered when the text like percentage changes). I don't like this, so I added this: If you click on the header `Status`, the animation will be enabled. Click again to disable it.
-
-4. The default style on macOS (`macOS`) can't render progress bars correctly inside a table, so the style of the queue is changed to `Fusion` on macOS and may looks different from the main window. *\*New in 1.0*
-
 ### Separation parameters
 
 #### Segment
@@ -130,6 +120,49 @@ Demucs GUI will overwrite existing files without warning. Remember to include `{
 Demucs GUI will use FFMpeg to read files if the default backend Soundfile (which uses libsndfile) fails, which enables separating a video (its audio stream, actually). When reading with FFMpeg, Demucs GUI will call `ffmpeg -v level+warning -i "{file}" -map a:0 -ar {samplerate} -c:a pcm_f32le -f wav -` and decode the stdout. So only the first stream of the file will be separated. If the file contains no audio stream, separation will fail. *\*New in 1.0*
 
 Demucs GUI will calls FFMpeg according to PATH environment variable. Before detecting FFMpeg, `./ffmpeg` will be added to PATH. You can control where to insert it (before or after the original PATH) in the config file. *\*New in 1.0*
+
+### Encoder
+
+Demucs GUI supports two encoders: `soundfile` and `ffmpeg`. `soundfile` is the default encoder which uses libsndfile. It is faster and simpler, but only supports `wav` and `flac` format (available sample formats are `int16`, `int24`, `float32`; `float32` is only available for `wav`). `ffmpeg` supports more complex formats and codecs, but is likely to fail if you didn't enter the command correctly. *\*New in 1.2a1*
+
+#### FFMpeg options
+
+You only need to enter a command line and target file extension. Demucs GUI will encode separated audio to wav format (float32 sample format) and pipe it to ffmpeg stdin. Please remember to add `-sample_fmt {Your_sample_format}` to the command line if you want to use other sample formats (like `s16` or `s24`). You can read more about FFMpeg options in [FFMpeg documentation](https://ffmpeg.org/ffmpeg-all.html#Audio-Options). Your command line will be splitted using Python library `shlex` (which uses Linux shell syntax) and you can see the splitted command line as you type in your command. FFMpeg stdout will be ignored and stderr will be logged to log file.
+
+There are several variables you can use in the command line and target file extension:
+- `{input}`: input file name without extension
+- `{inputext}`: input file extension
+- `{inputpath}`: input file path (without file name)
+- `{output}`: output file full path (not available in target file extension)
+
+You can also save presets for FFMpeg options. Each preset will save the command line and target file extension. Its usage is same as the mixer presets, which you can refer to [Mixer presets](#Presets).
+
+There are three default presets: `MP3`, `AAC`, `Copy video stream`. You can use them as an example.
+
+##### `MP3`
+Command: `ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}`
+Extension: `mp3`
+Encode separated audio to mp3 format with 320k bitrate (You can change it in the command line).
+
+##### `AAC`
+Command: `ffmpeg -y -v level+warning -i - -c:a aac -b:a 320k {output}`
+Extension: `m4a`
+Encode separated audio to m4a format with 320k bitrate (You can change it in the command line).
+
+##### `Copy video stream`
+Command: `ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} -map 1:v -map 0:a -c:v copy {output}`
+Extension: `{inputext}`
+Copy the first video stream of the input file and the separated audio to the output file. The output file will have the same extension as the input file. Please note that this may fail due to complex reasons. To check the actual reason, you may need to check the log file and search for FFMpeg documentation.
+
+### Some "useless" functions of separation queue
+
+1. You can drag and drop files to the queue to add them. (It's quite useful, isn't it?) But one thing is not supported: You can't drag a file or a folder from Windows to the application ran in WSL.
+
+2. You can click on the header `File` to show full file path or file name. Hover on an item in the queue to show its full path.
+
+3. On Windows, the progress bar should have animation. However, rendering a lot of progress bars at the same time (like the queue) will consume a lot of CPU resources. So, the animation is disabled in the queue (animation will still be rendered when the text like percentage changes). I don't like this, so I added this: If you click on the header `Status`, the animation will be enabled. Click again to disable it.
+
+4. The default style on macOS (`macOS`) can't render progress bars correctly inside a table, so the style of the queue is changed to `Fusion` on macOS and may looks different from the main window. *\*New in 1.0*
 
 ## About the config file
 

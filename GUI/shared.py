@@ -77,7 +77,7 @@ Available variables:
 - {inputext}: input file extension
 - {inputpath}: input file path (without file name)
 - {output}: output file full path
-Variables above will be replaced twice so you can use them in save location and file extension."""
+Variables about input file above will also be replaced in file extension."""
 
 update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
 

@@ -1062,7 +1062,9 @@ class SaveOptions(QGroupBox):
                 case 0:
                     file_ext = self.file_format.currentText()
                 case 1:
-                    file_ext = self.file_extension.text()
+                    file_ext = self.file_extension.text().format(
+                        input=file.stem, inputext=file.suffix[1:], inputpath=str(file.parent)
+                    )
                 case _:
                     file_ext = "wav"
             file_path_str = self.loc_input.currentText().format(
@@ -1095,11 +1097,6 @@ class SaveOptions(QGroupBox):
                     case 1:
                         command = [
                             i.format(
-                                input=file.stem,
-                                inputext=file.suffix[1:],
-                                inputpath=str(file.parent),
-                                output=str(file_path),
-                            ).format(
                                 input=file.stem,
                                 inputext=file.suffix[1:],
                                 inputpath=str(file.parent),
@@ -1161,7 +1158,9 @@ class SaveOptions(QGroupBox):
             ):
                 return
         logging.info("Save preset %s:\ncommand: %s\next: %s" % (name, self.command.text(), self.file_extension.text()))
-        shared.AddHistory("ffmpeg_presets", name, value={"command": self.command.text(), "ext": self.file_extension.text()})
+        shared.AddHistory(
+            "ffmpeg_presets", name, value={"command": self.command.text(), "ext": self.file_extension.text()}
+        )
 
     def removePreset(self):
         name = self.preset_selector.currentText()
@@ -1189,7 +1188,7 @@ class SaveOptions(QGroupBox):
             main_window.showWarning.emit(
                 "Set default preset",
                 "Your current settings are different from the preset settings. If you want to set your current "
-                "settings as the default, please save it first."
+                "settings as the default, please save it first.",
             )
         shared.SetHistory("ffmpeg_default_preset", value=preset)
 
