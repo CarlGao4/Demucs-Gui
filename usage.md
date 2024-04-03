@@ -74,7 +74,7 @@ These outputs are created for each stem.
 
 You can enable or disable a stem by clicking on the checkbox on the left of the stem name. If you've selected more than one cells and clicked on a checkbox whose row has been selected, all the selected cells will be enabled or disabled.
 
-Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem color volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer. The parameters of default outputs can't be changed.
+Double click on a cell of stem name to edit the name of the stem (this name will be used in the output file name variable `{stem}`). Double click on a cell of stem volume to edit the volume of the stem. The volume is a percentage from -500% to 500%. You can also change the value of all selected cells by dragging the slider on the bottom of the mixer. The parameters of default outputs can't be changed.
 
 You can also add your own stems by clicking "Add" button. Remember that **do not enable a stem with the same name as an existing stem**. The behavior of this is undefined.
 
@@ -109,7 +109,7 @@ Choose which device to use. If you install ROCm version, your AMD GPU will also 
 - `Relative path`: Save output files in the same location of the source file
 - `Absolute path`: Save output files directly to the path. Please remember that it must start from root dir (like `/` on *nix and `C:\` on Windows) or something unexpected will happen.
 
-You can use variables to rename your output file. Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, track extension, stem name, default output file extension and model name.
+You can use variables to rename your output file. Variables `{track}`, `{trackext}`, `{stem}`, `{ext}`, `{model}` will be replaced with track name without extension, track extension, stem name, default output file extension and model name.
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default location `separated/{model}/{track}/{stem}.{ext}` would be "separated/htdemucs/audio/vocals.flac", with the folder "separated" created under the same folder of the original audio file.
 
@@ -140,18 +140,27 @@ You can also save presets for FFMpeg options. Each preset will save the command 
 There are three default presets: `MP3`, `AAC`, `Copy video stream`. You can use them as an example.
 
 ##### `MP3`
+
 Command: `ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}`
+
 Extension: `mp3`
+
 Encode separated audio to mp3 format with 320k bitrate (You can change it in the command line).
 
 ##### `AAC`
+
 Command: `ffmpeg -y -v level+warning -i - -c:a aac -b:a 320k {output}`
+
 Extension: `m4a`
+
 Encode separated audio to m4a format with 320k bitrate (You can change it in the command line).
 
 ##### `Copy video stream`
+
 Command: `ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} -map 1:v -map 0:a -c:v copy {output}`
+
 Extension: `{inputext}`
+
 Copy the first video stream of the input file and the separated audio to the output file. The output file will have the same extension as the input file. Please note that this may fail due to complex reasons. To check the actual reason, you may need to check the log file and search for FFMpeg documentation.
 
 ### Some "useless" functions of separation queue
@@ -208,6 +217,8 @@ The path to the model cache, where the downloaded remote models will be saved an
 
 If you have chosen a remote model and are using it for the first time, it will be downloaded automatically. During this period of time, there will be no outputs and the whole window will be frozen. Please be patient.
 
+From 1.1a1, download progress will be shown on the status bar.
+
 ### The application triggers my antivirus software
 
 Demucs GUI is packed with PyInstaller. All softwares packed with PyInstaller uses similar bootloader with different payloads. Once a new version of PyInstaller is released, countless developers will package their softwares with the latest version and distribute them. This may be seen as a virus as viruses can hide themselves in normal softwares, which contains different payloads but the same bootloader and spread all around the world.
@@ -224,7 +235,7 @@ Until now, there are only three possible reasons for this:
 
 1. Failed to read the audio. Maybe you forgot to add read permission to the audio file, or the audio file is broken, or the audio file is not supported by Demucs.
 
-2. Failed to write the audio. Most likely that you forgot to add write permission to the folder you want to save the separated audio. And, FLAC format does NOT support float32.
+2. Failed to write the audio. Most likely that you forgot to add write permission to the folder you want to save the separated audio. And, FLAC format does NOT support float32. From 1.2a1, you can also use FFMpeg to encode your output, so FFMpeg can also be the reason to fail if your command is not correct.
 
 3. Out of memory. There are two kinds of out of memory:
 - Out of system memory: The solution to this is to truncate the audio file into smaller pieces (or enlarge your swapfile on Linux). Demucs GUI will read the whole audio into memory and convert it into float32 format. The separated stems are also saved in memory before written. If the audio is too long, it will consume too much memory and cause out of memory.
