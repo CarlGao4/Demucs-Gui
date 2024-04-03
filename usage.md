@@ -32,7 +32,7 @@
 If the application cannot be launched due to the Mac's security protection feature, try the following:
 
 1. Right-click on the Demucs-GUI app icon and select "Open".
-1. Click "Open" again in the window that appears as follows.
+2. Click "Open" again in the window that appears as follows.
 ![Open Anyway](./mac_open_anyway.png)
 
 </details>
@@ -57,7 +57,7 @@ Model list will be updated automatically after you add or remove a repo. You can
 
 The order of listed models is bag of models (yaml file) first, and single models (th file) goes after them. Models with same name from different repos can be listed multiple times, so you should take a look at the info area of the selected model before loading it.
 
-Once you've loaded a model, you can't load another model or unload it. The only way to unload a model is to restart Demucs GUI. I know that this may be annoying, but it's impossible to know the sources of a model after loading it, so the first thing you must do after launching Demucs GUI is to load a model so other functions (like the mixer) can be initialized. As a result, I only added a "restart" button to the menu bar. *\*New in 1.1a2*
+Once you've loaded a model, you can't load another model or unload it. The only way to unload a model is to restart Demucs GUI. I know that this may be annoying, but it's impossible to know the sources of a model without loading it, so the first thing you must do after launching Demucs GUI is to load a model so other functions (like the mixer) can be initialized. As a result, I added a "restart" button to the menu bar (*\*New in 1.1a2*).
 
 ### Mixer
 *\*New in 1.1a2*
@@ -68,7 +68,7 @@ On default, Demucs GUI has following outputs:
 
 1. "Single stems": Do not mix at all, save the outputs of each stem separately. This is enabled by default.
 2. "Minus stems": Extract the specific stem from original audio (Or, original audio minus the specific stem).
-3. "No stems": Mix all the stems except the specific stem together.
+3. "No stems": Mix all the stems except the specific stem together. ***Not recommended** personally as "other" stem is treated same as stems like "vocals", which means adding up all the stems does not equal to the original audio. I'd suggest use the minus stems above instead.*
 
 These outputs are created for each stem.
 
@@ -135,7 +135,7 @@ There are several variables you can use in the command line and target file exte
 - `{inputpath}`: input file path (without file name)
 - `{output}`: output file full path (not available in target file extension)
 
-You can also save presets for FFMpeg options. Each preset will save the command line and target file extension. Its usage is same as the mixer presets, which you can refer to [Mixer presets](#Presets).
+You can also save presets for FFMpeg options. Each preset will save the command line and target file extension. Its usage is same as the mixer presets (except that every preset can be apply to model), which you can refer to [Mixer presets](#Presets).
 
 There are three default presets: `MP3`, `AAC`, `Copy video stream`. You can use them as an example.
 
