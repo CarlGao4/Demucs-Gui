@@ -1,5 +1,14 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.2a1*
+Release date: Apr. 8, 2024
+
+#### Updates
+1. FFMpeg encoder! Now you can use FFMpeg to encode output file
+
+#### Fixes
+1. PdhAddEnglishCounterW failed when starting
+
 ### 1.1
 Release date: Mar. 21, 2024
 
