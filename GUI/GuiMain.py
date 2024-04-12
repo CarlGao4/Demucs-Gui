@@ -14,7 +14,11 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the \
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License \
-along with this program.  If not, see <https://www.gnu.org/licenses/>."""
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+The training set of official models released by demucs developers contains \
+the MusDB dataset, so you must follow its license when using these models. \
+For example, the output of these models can only be for research purposes."""
 
 import shared
 

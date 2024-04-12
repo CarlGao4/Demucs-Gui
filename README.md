@@ -100,7 +100,7 @@ pip install -r requirements_rocm.txt
 
 **Make sure that you have discrete Intel graphics card or an Intel CPU that is 11th generation or newer with integrated graphics card** (Because we need its driver)
 
-1. Install latest Intel graphics driver ([Windows link](https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html)). This accelerator requires Intel® Arc™ & Iris® Xe Graphics driver (which means, Intel® Arc™ A-Series Graphics, Intel® Iris® Xe Graphics, and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics). Though I would discourage you to use this "accelerator" with integrated graphics card as it is even slower than pure CPU.
+1. Install latest Intel graphics driver ([Windows link](https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html)). This accelerator requires Intel® Arc™ & Iris® Xe Graphics driver (which means, Intel® Arc™ A-Series Graphics, Intel® Iris® Xe Graphics, and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics). Though I would discourage you to use this "accelerator" with integrated graphics card as it may even slower than pure CPU sometimes.
 2. Install Python (and git if you'd like to clone this repository) to your system.
 3. Download zip of this branch and extract it to a folder, or clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
 4. Use pip to install all packages in [requirements_intel_gpu_mkl.txt](requirements_intel_gpu_mkl.txt).
