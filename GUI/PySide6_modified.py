@@ -142,6 +142,9 @@ class ExpandingQPlainTextEdit(QPlainTextEdit):
         self.updateGeometry()
         return super().resizeEvent(event)
 
+    def text(self):
+        return self.toPlainText()
+
 
 class DelegateCombiner(QStyledItemDelegate):
     """So that we can use multiple delegates in the same QTableView. Will also count editors."""

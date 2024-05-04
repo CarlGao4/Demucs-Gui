@@ -1197,7 +1197,7 @@ class SaveOptions(QGroupBox):
         shared.SetHistory("ffmpeg_default_preset", value=preset)
 
     def showParsedCommand(self):
-        command = self.command.toPlainText()
+        command = self.command.text()
         if "\r" in command or "\n" in command:
             self.command.setPlainText(command.replace("\r", "").replace("\n", ""))
             return
