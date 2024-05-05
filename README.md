@@ -86,7 +86,7 @@ pip install -r requirements_cuda.txt
 
 ### Accelerate with AMD GPU (Linux only)
 1. Install Python (and git if you'd like to clone this repository) to your system.
-2. Download zip of this branch and extract it to a folder, or clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
+2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
 3. *Skip this step if you don't need to switch the default version of PyTorch.* Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally). There is no requirement of cuda version, but the version of torch should be 2.0.x (2.1.0 and higher will cause errors sometimes)
 4. Use pip to install all packages in [requirements_rocm.txt](requirements_rocm.txt).
 ```bash
@@ -102,7 +102,7 @@ pip install -r requirements_rocm.txt
 
 1. Install latest Intel graphics driver ([Windows link](https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html)). This accelerator requires Intel® Arc™ & Iris® Xe Graphics driver (which means, Intel® Arc™ A-Series Graphics, Intel® Iris® Xe Graphics, and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics). Though I would discourage you to use this "accelerator" with integrated graphics card as it may even slower than pure CPU sometimes.
 2. Install Python (and git if you'd like to clone this repository) to your system.
-3. Download zip of this branch and extract it to a folder, or clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
+3. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
 4. Use pip to install all packages in [requirements_intel_gpu_mkl.txt](requirements_intel_gpu_mkl.txt).
 ```bash
 # For pip
