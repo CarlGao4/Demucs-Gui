@@ -10,9 +10,9 @@ Soundfile>=0.9.0
 soxr>=0.3.6
 packaging
 ordered-set
-torch==2.1.0a0
-torchaudio==2.1.0a0  # This is a requirement of demucs but not Demucs-GUI, added or pip can't find this solution
-intel-extension-for-pytorch==2.1.10
+torch==2.1.0.post2
+torchaudio==2.1.0.post2  # This is a requirement of demucs but not Demucs-GUI, added or pip can't find this solution
+intel-extension-for-pytorch==2.1.30
 mkl
 mkl-dpcpp
 certifi
