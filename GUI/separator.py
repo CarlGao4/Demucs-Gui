@@ -77,6 +77,7 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
                     if dll_size < 1073741824:
                         logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
                         Intel_JIT_only = True
+                break
     import demucs.api
     import demucs.apply
     import audio
@@ -90,18 +91,21 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
         else:
             update_status("MPS backend is not available")
     else:
+        backends = []
         if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
-            update_status("CUDA backend is available")
+            backends.append("CUDA")
             logging.info(
                 "CUDA Info: "
                 + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
             )
-        elif ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
-            update_status("Intel MKL backend is available")
+        if ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
+            backends.append("Intel MKL")
             logging.info(
                 "Intel MKL Info: "
                 + "    \n".join(str(torch.xpu.get_device_properties(i)) for i in range(torch.xpu.device_count()))
             )
+        if backends:
+            update_status(", ".join(backends) + " backend is available")
         else:
             update_status("No accelerator backend is available")
     time.sleep(1)
@@ -144,7 +148,7 @@ def getAvailableDevices():
                     max_memory = device_property.total_memory
                     if hasattr(device_property, "gpu_eu_count") and device_property.gpu_eu_count >= 96:
                         default_device = len(devices) - 1
-        elif torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
+        if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
             max_memory = 0
             for i in range(torch.cuda.device_count()):
                 device_property = torch.cuda.get_device_properties(i)

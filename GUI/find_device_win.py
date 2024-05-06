@@ -25,77 +25,81 @@ import shared
 
 # These mappings are generated with ocloc.exe, I ran from 0x0000 to 0xFFFF and found all supported devices
 PCI_Mappings = {
-    "12.0.0": {"9A40", "9A49", "9A59", "9A60", "9A68", "9A70", "9A78", "FF20"},
-    "12.1.0": {"4C80", "4C8A", "4C8B", "4C8C", "4C90", "4C9A"},
-    "12.2.0": {
-        "4680",
-        "4682",
-        "4688",
-        "468A",
-        "4690",
-        "4692",
-        "4693",
-        "A780",
-        "A781",
-        "A782",
-        "A783",
-        "A788",
-        "A789",
-        "A78B",
-    },
-    "12.3.0": {
-        "4626",
-        "4628",
-        "462A",
-        "46A0",
-        "46A1",
-        "46A2",
-        "46A3",
-        "46A6",
-        "46A8",
-        "46AA",
-        "46B0",
-        "46B1",
-        "46B2",
-        "46B3",
-        "46C0",
-        "46C1",
-        "46C2",
-        "46C3",
-        "A720",
-        "A721",
-        "A7A0",
-        "A7A1",
-        "A7A8",
-        "A7A9",
-    },
-    "12.4.0": {"46D0", "46D1", "46D2"},
-    "12.10.0": {"4905", "4906", "4907", "4908"},
-    "12.55.8": {"4F80", "4F81", "4F82", "4F83", "4F84", "5690", "5691", "5692", "56A0", "56A1", "56A2", "56C0"},
-    "12.56.5": {"4F87", "4F88", "5693", "5694", "5695", "56A5", "56A6", "56B0", "56B1", "56C1"},
-    "12.57.0": {"4F85", "4F86", "5696", "5697", "56A3", "56A4", "56B2", "56B3"},
-    "12.58.0": {"4F8C", "5698", "5699", "569A", "56A7", "56A8"},
-    "12.59.0": {"4F89", "56A9", "56AA"},
+    "2.1.10": {
+        "12.0.0": {"9A40", "9A49", "9A59", "9A60", "9A68", "9A70", "9A78", "FF20"},
+        "12.1.0": {"4C80", "4C8A", "4C8B", "4C8C", "4C90", "4C9A"},
+        "12.2.0": {
+            "4680",
+            "4682",
+            "4688",
+            "468A",
+            "4690",
+            "4692",
+            "4693",
+            "A780",
+            "A781",
+            "A782",
+            "A783",
+            "A788",
+            "A789",
+            "A78B",
+        },
+        "12.3.0": {
+            "4626",
+            "4628",
+            "462A",
+            "46A0",
+            "46A1",
+            "46A2",
+            "46A3",
+            "46A6",
+            "46A8",
+            "46AA",
+            "46B0",
+            "46B1",
+            "46B2",
+            "46B3",
+            "46C0",
+            "46C1",
+            "46C2",
+            "46C3",
+            "A720",
+            "A721",
+            "A7A0",
+            "A7A1",
+            "A7A8",
+            "A7A9",
+        },
+        "12.4.0": {"46D0", "46D1", "46D2"},
+        "12.10.0": {"4905", "4906", "4907", "4908"},
+        "12.55.8": {"4F80", "4F81", "4F82", "4F83", "4F84", "5690", "5691", "5692", "56A0", "56A1", "56A2", "56C0"},
+        "12.56.5": {"4F87", "4F88", "5693", "5694", "5695", "56A5", "56A6", "56B0", "56B1", "56C1"},
+        "12.57.0": {"4F85", "4F86", "5696", "5697", "56A3", "56A4", "56B2", "56B3"},
+        "12.58.0": {"4F8C", "5698", "5699", "569A", "56A7", "56A8"},
+        "12.59.0": {"4F89", "56A9", "56AA"},
+    }
 }
 
 AOT_link_fmt = "https://www.fosshub.com/Demucs-GUI-old.html?dwl={file}"
 AOT_links = {
-    "12.0.0": "12.0.0_tgl_tgllp.7z",
-    "12.1.0": "12.1.0_rkl.7z",
-    "12.2.0": "12.2.0_adl-s.7z",
-    "12.3.0": "12.3.0_adl-p.7z",
-    "12.4.0": "12.4.0_adl-n.7z",
-    "12.10.0": "12.10.0_dg1.7z",
-    "12.55.0": "12.55.0_dg2-g10-a0.7z",
-    "12.55.1": "12.55.1_dg2-g10-a1.7z",
-    "12.55.4": "12.55.4_dg2-g10-b0.7z",
-    "12.55.8": "12.55.8_acm-g10_ats-m150_dg2-g10_dg2-g10-c0.7z",
-    "12.56.0": "12.56.0_dg2-g11-a0.7z",
-    "12.56.4": "12.56.4_dg2-g11-b0.7z",
-    "12.56.5": "12.56.5_acm-g11_ats-m75_dg2-g11_dg2-g11-b1.7z",
-    "12.57.0": "12.57.0_acm-g12_dg2-g12_dg2-g12-a0.7z",
-    "12.58.0": "12.58.0_acm-g20_dg2-g20.7z",
-    "12.59.0": "12.59.0_acm-g21_dg2-g21.7z",
+    "2.1.10": {
+        "12.0.0": "12.0.0_tgl_tgllp.7z",
+        "12.1.0": "12.1.0_rkl.7z",
+        "12.2.0": "12.2.0_adl-s.7z",
+        "12.3.0": "12.3.0_adl-p.7z",
+        "12.4.0": "12.4.0_adl-n.7z",
+        "12.10.0": "12.10.0_dg1.7z",
+        "12.55.0": "12.55.0_dg2-g10-a0.7z",
+        "12.55.1": "12.55.1_dg2-g10-a1.7z",
+        "12.55.4": "12.55.4_dg2-g10-b0.7z",
+        "12.55.8": "12.55.8_acm-g10_ats-m150_dg2-g10_dg2-g10-c0.7z",
+        "12.56.0": "12.56.0_dg2-g11-a0.7z",
+        "12.56.4": "12.56.4_dg2-g11-b0.7z",
+        "12.56.5": "12.56.5_acm-g11_ats-m75_dg2-g11_dg2-g11-b1.7z",
+        "12.57.0": "12.57.0_acm-g12_dg2-g12_dg2-g12-a0.7z",
+        "12.58.0": "12.58.0_acm-g20_dg2-g20.7z",
+        "12.59.0": "12.59.0_acm-g21_dg2-g21.7z",
+    }
 }
 
 gpus = []
@@ -113,10 +117,12 @@ for line in p.communicate()[0].decode().splitlines():
             has_Intel = True
 
 
-def is_intel_supported(vendor, device):
+def is_intel_supported(vendor, device, ipex_version="2.1.10"):
     if vendor != "8086":
         return
-    for k, v in PCI_Mappings.items():
+    if ipex_version not in PCI_Mappings:
+        return
+    for k, v in PCI_Mappings[ipex_version].items():
         if device in v:
             return k
     # for v in Supported_But_Unknown:
@@ -125,10 +131,16 @@ def is_intel_supported(vendor, device):
     return False
 
 
-def get_download_link(version):
-    if version in AOT_links:
-        return AOT_link_fmt.format(file=AOT_links[version])
+def get_download_link(version, ipex_version="2.1.10"):
+    if ipex_version not in AOT_links:
+        return None
+    if version in AOT_links[ipex_version]:
+        return AOT_link_fmt.format(file=AOT_links[ipex_version][version])
     return None
+
+
+def ipex_version_available(ipex_version="2.1.10"):
+    return ipex_version in PCI_Mappings and ipex_version in AOT_links
 
 
 # I attach a copy of the first version of this list below

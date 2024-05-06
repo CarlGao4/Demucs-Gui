@@ -495,8 +495,18 @@ class MainWindow(QMainWindow):
 
     def ask_AOT(self, *, open_from_menu=True):
         intel_gpus = []
+        ipex_version = separator.ipex.__version__.split("+", 1)[0] if separator.ipex is not None else None
+        if not find_device_win.ipex_version_available(ipex_version):
+            if open_from_menu:
+                self.m.warning(
+                    self,
+                    "Unsupported IPEX version",
+                    "I didn't build the AOT version for this version of IPEX. Maybe you can try building it yourself "
+                    "if you are running from source.",
+                )
+            return
         for i in find_device_win.gpus:
-            if gpu_ver := find_device_win.is_intel_supported(i[1], i[2]):
+            if gpu_ver := find_device_win.is_intel_supported(i[1], i[2], ipex_version):
                 intel_gpus.append((i[0], gpu_ver))
         if not intel_gpus:
             self.m.warning(self, "No supported Intel GPU found", "No supported Intel GPU found.")
@@ -528,7 +538,7 @@ class MainWindow(QMainWindow):
             while True:
                 m.exec()
                 if m.clickedButton() == download_button:
-                    webbrowser.open(find_device_win.get_download_link(gpu_ver))
+                    webbrowser.open(find_device_win.get_download_link(gpu_ver, ipex_version))
                 elif m.clickedButton() == doc_button:
                     webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/MKL-AOT.md")
                 else:
@@ -561,7 +571,7 @@ class MainWindow(QMainWindow):
                 else:
                     for i in download_buttons:
                         if m.clickedButton() == i[1]:
-                            webbrowser.open(find_device_win.get_download_link(i[0]))
+                            webbrowser.open(find_device_win.get_download_link(i[0], ipex_version))
                             break
 
 
@@ -2038,7 +2048,7 @@ if __name__ == "__main__":
         import find_device_win
 
     if shared.use_PyQt6:
-        import PyQt6.QtCore
+        import PyQt6.QtCore  # type: ignore
 
         logging.info("Using PyQt6")
         logging.info("Qt version: %s" % PyQt6.QtCore.QT_VERSION_STR)
