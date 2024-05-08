@@ -110,7 +110,7 @@ pip install -r requirements_intel_gpu_mkl.txt
 # Conda is not available as this project has dependencies only on PyPI
 ```
 5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
-6. If it could not start up and sometimes raises an error like `OSError: [WinError 126] Error loading "***\torch\lib\backend_with_compiler.dll" or one of its dependencies`, you may have to manually download libuv and put it in the folder `torch\lib` under your python site packages installation path.
+6. If it could not start up and sometimes raises an error like `OSError: [WinError 126] Error loading "***\torch\lib\backend_with_compiler.dll" or one of its dependencies`, you may have to manually download libuv and put it in the folder `torch\lib` under your python site packages installation path. One easier way to solve this if you are using conda environment is to run `conda install conda-forge::libuv`.
 
 ## Acknowledgements
 This project includes code of [Demucs](https://github.com/adefossez/demucs) under MIT license.
