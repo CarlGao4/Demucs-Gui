@@ -37,6 +37,7 @@ import shared
 
 default_device = 0
 used_cuda = False
+used_xpu = False
 has_Intel = False
 Intel_JIT_only = False
 
@@ -50,8 +51,9 @@ class ModelSourceNameUnsupportedError(Exception):
 
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
-    global torch, demucs, audio, has_Intel, Intel_JIT_only
+    global torch, demucs, audio, has_Intel, Intel_JIT_only, np
     import torch
+    import numpy as np
 
     for i in range(5):
         try:
@@ -237,10 +239,13 @@ def autoListModels():
     return models, infos, each_repos
 
 
-def empty_cuda_cache():
+def empty_cache():
     if used_cuda:
         for _ in range(10):
             torch.cuda.empty_cache()
+    if used_xpu:
+        for _ in range(10):
+            torch.xpu.empty_cache()
 
 
 class Separator:
@@ -454,13 +459,16 @@ class Separator:
         logging.info("Start separating audio: %s" % file.name)
         logging.info("Parameters: segment=%.2f overlap=%.2f shifts=%d" % (segment, overlap, shifts))
         logging.info("Device: %s" % device)
-        global used_cuda
+        global used_cuda, used_xpu
         if device.startswith("cuda"):
             used_cuda = True
+        if device.startswith("xpu"):
+            used_xpu = True
         try:
             setStatus(shared.FileStatus.Reading, item)
             wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
             assert wav is not None
+            assert (np.isnan(wav).sum() == 0) and (np.isinf(wav).sum() == 0), "Audio contains NaN or Inf"
         except Exception:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
@@ -476,12 +484,15 @@ class Separator:
         self.time_hists = []
         self.last_update_eta = 0
 
+        self.separator.model.to("cpu")  # To avoid moving between different GPUs which may cause error
+
         try:
             self.updateStatus("Separating audio: %s" % file.name)
             self.separator.update_parameter(
                 device=device, segment=segment, shifts=shifts, overlap=overlap, callback=self.updateProgress
             )
             wav_torch = torch.from_numpy(wav).clone().transpose(0, 1)
+            assert (not wav_torch.isnan().any()) and (not wav_torch.isinf().any()), "Audio contains NaN or Inf"
             src_channels = wav_torch.shape[0]
             logging.info("Running separation...")
             self.time_hists.append((time.time(), 0))
@@ -508,6 +519,8 @@ class Separator:
             finishCallback(shared.FileStatus.Failed, item)
             self.separating = False
             return
+        finally:
+            self.separator.model.to("cpu")
         logging.info("Saving separated audio...")
         save_callback(file, wav_torch, out, self.save_callback, item, finishCallback)
         self.separating = False

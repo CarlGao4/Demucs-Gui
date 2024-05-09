@@ -1,4 +1,4 @@
-__version__ = "1.2a1"
+__version__ = "1.2b1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
@@ -124,6 +124,7 @@ import separator
 from PySide6_modified import (
     Action,
     DelegateCombiner,
+    DoNothingDelegate,
     ExpandingQPlainTextEdit,
     FileNameDelegate,
     PercentSpinBoxDelegate,
@@ -1072,6 +1073,8 @@ class SaveOptions(QGroupBox):
         finishCallback(shared.FileStatus.Writing, item)
         shared.AddHistory("save_location", value=self.loc_input.currentText())
         for stem, stem_data in main_window.mixer.mix(origin, tensor):
+            if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
+                logging.warning("NaN or inf found in stem %s" % stem)
             match self.encoder_group.checkedId():
                 case 0:
                     file_ext = self.file_format.currentText()
@@ -1437,6 +1440,12 @@ class FileQueue(QWidget):
                 shared.FileStatus.Cancelled,
                 shared.FileStatus.Failed,
             ]:
+                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+                    shared.FileStatus.Cancelled,
+                    shared.FileStatus.Failed,
+                ]:
+                    self.queue_length += 1
+                    main_window.updateQueueLength()
                 self.table.item(i, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
                 self.table.item(i, 1).setData(ProgressDelegate.TextRole, "Queued")
 
@@ -1540,6 +1549,9 @@ class Mixer(QWidget):
         self.delegate.addDelegate(
             PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1),
             lambda x: x.column() > 1 and x.row() >= len(main_window.separator.sources) * 3,
+        )
+        self.delegate.addDelegate(
+            DoNothingDelegate(), lambda x: x.column() >= 1 and x.row() < len(main_window.separator.sources) * 3
         )
         self.outputs_table.setItemDelegate(self.delegate)
 
@@ -1751,9 +1763,9 @@ class Mixer(QWidget):
         for stem, sources, enabled in preset[1]:
             # Calculate weights first
             # The order of sources is not guaranteed, so we need to use the index of the source
-            weights = [stem, sources["origin"]]
+            weights = [stem, f"{sources['origin']}%\u3000"]
             for source in main_window.separator.sources:
-                weights.append(sources[source])
+                weights.append(f"{sources[source]}%\u3000")
             self.outputs_table.addRow(weights, enabled)
 
     def duplicateSelected(self):
@@ -1949,7 +1961,7 @@ class SeparationControl(QWidget):
             self.start_button.setEnabled(True)
             main_window.save_options.encoder_ffmpeg_box.setEnabled(True)
             main_window.setStatusText.emit("No more file to separate")
-            separator.empty_cuda_cache()
+            separator.empty_cache()
             return
         file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
         item = main_window.file_queue.table.item(index, 1)

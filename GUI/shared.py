@@ -85,6 +85,31 @@ settingsLock = threading.Lock()
 historyLock = threading.Lock()
 
 
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS") and sys.platform == "win32":
+    # Popen should be wrapped to avoid WinError 50
+    subprocess._Popen = subprocess.Popen
+
+    def wrapped_Popen(*args, **kwargs):
+        if "stdout" in kwargs and kwargs["stdout"] is not None:
+            if "stderr" not in kwargs or kwargs["stderr"] is None:
+                kwargs["stderr"] = subprocess.PIPE
+            if "stdin" not in kwargs or kwargs["stdin"] is None:
+                kwargs["stdin"] = subprocess.PIPE
+        if "stderr" in kwargs and kwargs["stderr"] is not None:
+            if "stdout" not in kwargs or kwargs["stdout"] is None:
+                kwargs["stdout"] = subprocess.PIPE
+            if "stdin" not in kwargs or kwargs["stdin"] is None:
+                kwargs["stdin"] = subprocess.PIPE
+        if "stdin" in kwargs and kwargs["stdin"] is not None:
+            if "stdout" not in kwargs or kwargs["stdout"] is None:
+                kwargs["stdout"] = subprocess.PIPE
+            if "stderr" not in kwargs or kwargs["stderr"] is None:
+                kwargs["stderr"] = subprocess.PIPE
+        return subprocess._Popen(*args, **kwargs)
+
+    subprocess.Popen = wrapped_Popen
+
+
 def HSize(size):
     s = size
     t = 0
