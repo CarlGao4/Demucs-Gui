@@ -1,5 +1,17 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.2b1*
+Release date: May. 10, 2024
+
+#### Updates
+1. Supports CUDA and Intel MKL at the same time
+2. Supports Intel Extension for PyTorch `2.1.30+xpu`
+
+#### Fixes
+1. Can't write to the output file when using FFMpeg encoder
+2. Default mixer preset may be edited
+3. Applying mixer preset will cause error
+
 ### *1.2a1*
 Release date: Apr. 8, 2024
 
@@ -8,6 +20,9 @@ Release date: Apr. 8, 2024
 
 #### Fixes
 1. PdhAddEnglishCounterW failed when starting
+
+#### Known issues
+1. Can't write to the output file when using FFMpeg encoder
 
 ### 1.1
 Release date: Mar. 21, 2024
