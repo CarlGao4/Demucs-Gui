@@ -1,4 +1,4 @@
-__version__ = "1.2b1"
+__version__ = "1.2b2"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
@@ -2076,7 +2076,9 @@ if __name__ == "__main__":
     starting_window = StartingWindow()
     starting_window.show()
     logging.debug("Supported styles: %s" % ", ".join(QStyleFactory.keys()))
-    style_setting = shared.GetSetting("style", app.style().objectName())
+    style_setting = shared.GetSetting(
+        "style", "windowsvista" if (default_style := app.style().objectName().lower()) == "windows11" else default_style
+    )  # Currently Windows11 style is not stable enough
     if style_setting.lower() in [i.lower() for i in QStyleFactory.keys()]:
         app.setStyle(QStyleFactory.create(style_setting))
     logging.debug("Current style: %s" % app.style().objectName())

@@ -100,6 +100,7 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float]
                 "CUDA Info: "
                 + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
             )
+            logging.info("CUDA Arch list: " + str(torch.cuda.get_arch_list()))
         if ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
             backends.append("Intel MKL")
             logging.info(
