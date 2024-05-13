@@ -1,5 +1,15 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.2b2*
+Release date: May. 13, 2024
+
+#### Updates
+1. Changed library versions so more NVIDIA GPUs are supported
+
+#### Fixes
+1. Latest Qt 6.7.0 has added `windows11` window style, which is not stable yet. Automatically switch to `windowsvista` style if `windows11` is default.
+2. May fail to initialize on some Windows systems
+
 ### *1.2b1*
 Release date: May. 10, 2024
 
