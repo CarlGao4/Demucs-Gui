@@ -252,6 +252,7 @@ class MainWindow(QMainWindow):
         self.menu_clear_location = Action(
             "Clear saved file location", self, lambda: shared.ResetHistory("save_location")
         )
+        self.menu_reset_style = Action("Reset style", self, lambda: shared.SetSetting("style", None))
         self.menu_check_update = Action(
             "Check for update",
             self,
@@ -265,6 +266,7 @@ class MainWindow(QMainWindow):
                 self.menu_about_usage,
                 self.menu_clear_history,
                 self.menu_clear_location,
+                self.menu_reset_style,
                 self.menu_check_update,
                 self.menu_restart,
                 self.menu_about_log,
@@ -467,13 +469,14 @@ class MainWindow(QMainWindow):
             self.m.question(
                 self,
                 "Clear history",
-                "Are you sure you want to clear the history? This action cannot be undone.",
+                "Are you sure you want to clear the history? This action cannot be undone. (Restart required)",
                 self.m.StandardButton.Yes,
                 self.m.StandardButton.No,
             )
             == self.m.StandardButton.Yes
         ):
             shared.ResetHistory()
+            app.quit()
 
     def restart(self):
         if (

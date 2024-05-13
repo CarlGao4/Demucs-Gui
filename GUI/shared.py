@@ -198,11 +198,15 @@ def SetSetting(attr, value):
             func_name = func_name[-3].name
         else:
             func_name = func_name[-2].name
-        logging.debug('(%s) Set setting "%s" to %s' % (func_name, attr, str(value)))
-        if attr in settings and settings[attr] == value:
-            logging.debug("Setting not changed, ignored")
-            return
-        settings[attr] = value
+        if value is None:
+            logging.debug('(%s) Remove setting "%s"' % (func_name, attr))
+            del settings[attr]
+        else:
+            logging.debug('(%s) Set setting "%s" to %s' % (func_name, attr, str(value)))
+            if attr in settings and settings[attr] == value:
+                logging.debug("Setting not changed, ignored")
+                return
+            settings[attr] = value
         try:
             settings_write_data = json.dumps(settings, separators=(",", ":"))
             with open(str(settingsFile), mode="wt", encoding="utf8") as f:
