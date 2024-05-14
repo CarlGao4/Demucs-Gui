@@ -1151,7 +1151,7 @@ class SaveOptions(QGroupBox):
             "Copy video stream",
             {
                 "command": "ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} "
-                "-map 1:v -map 0:a -c:v copy {output}",
+                "-map 1:v? -map 0:a -c:v copy {output}",
                 "ext": "{inputext}",
             },
         )
