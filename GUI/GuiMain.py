@@ -338,6 +338,12 @@ class MainWindow(QMainWindow):
                 % (model, ('"' + str(repo) + '"') if repo is not None else "remote repo", traceback.format_exc())
             )
             return False
+        except SystemExit:
+            logging.error(
+                "Failed to load model %s from %s:\n%s"
+                % (model, ('"' + str(repo) + '"') if repo is not None else "remote repo", traceback.format_exc())
+            )
+            return False
         return True
 
     def closeEvent(self, event):
@@ -1945,6 +1951,11 @@ class SeparationControl(QWidget):
         global main_window
         if not self.start_button.isEnabled():
             return
+        if (index := main_window.file_queue.getFirstQueued()) is None:
+            main_window.save_options.encoder_ffmpeg_box.setEnabled(True)
+            main_window.setStatusText.emit("No more file to separate")
+            separator.empty_cache()
+            return
         if "{stem}" not in main_window.save_options.loc_input.currentText():
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         if main_window.save_options.encoder_group.checkedId() == 1:
@@ -1960,12 +1971,6 @@ class SeparationControl(QWidget):
                     'Command does not contain "-v" for ffmpeg encoder. May output too much information to log file.',
                 )
         self.start_button.setEnabled(False)
-        if (index := main_window.file_queue.getFirstQueued()) is None:
-            self.start_button.setEnabled(True)
-            main_window.save_options.encoder_ffmpeg_box.setEnabled(True)
-            main_window.setStatusText.emit("No more file to separate")
-            separator.empty_cache()
-            return
         file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
         item = main_window.file_queue.table.item(index, 1)
         item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Separating])

@@ -16,3 +16,4 @@ intel-extension-for-pytorch==2.1.30
 mkl
 mkl-dpcpp
 certifi
+diffq>=0.2.1

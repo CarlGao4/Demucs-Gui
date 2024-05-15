@@ -11,3 +11,4 @@ soxr>=0.3.6
 packaging
 ordered-set
 certifi
+diffq>=0.2.1
