@@ -105,6 +105,7 @@ import datetime
 import json
 import logging
 import logging.handlers
+import math
 import os
 import packaging.version
 import pathlib
@@ -782,7 +783,7 @@ class SepParamSettings(QGroupBox):
         self.segment_label.setToolTip("Length of each segment")
 
         self.segment_spinbox = QDoubleSpinBox()
-        self.segment_spinbox.setRange(0.1, float(main_window.separator.default_segment))
+        self.segment_spinbox.setRange(0.1, math.floor(float(main_window.separator.default_segment) * 10) / 10)
         self.segment_spinbox.setSingleStep(0.1)
         self.segment_spinbox.setValue(self.segment_spinbox.maximum())
         self.segment_spinbox.setSuffix("s")
