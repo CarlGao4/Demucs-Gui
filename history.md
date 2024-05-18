@@ -1,5 +1,14 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.2
+Release date: May. 18, 2024
+
+#### Fixes
+1. Fixed an issue that "copy video stream" can't deal with pure audio files with no video stream
+2. Added diffq as a requirement so quantized models can be used
+3. Fix segment length may greater than max available length which will cause an error
+4. Will only warn the user once if output file name and FFMpeg command may illegal
+
 ### *1.2b2*
 Release date: May. 13, 2024
 

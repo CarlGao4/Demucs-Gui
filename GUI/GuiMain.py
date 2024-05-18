@@ -1,4 +1,4 @@
-__version__ = "1.2b2"
+__version__ = "1.2"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
