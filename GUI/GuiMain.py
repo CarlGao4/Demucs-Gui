@@ -1823,7 +1823,7 @@ class Mixer(QWidget):
 
 
 class SeparationControl(QWidget):
-    startSeparateSignal = Signal()
+    startSeparateSignal = Signal(bool)
     currentFinishedSignal = Signal(int, QTableWidgetItem)
     setModelProgressSignal = Signal(float)
     setAudioProgressSignal = Signal(float, QTableWidgetItem)
@@ -1946,9 +1946,9 @@ class SeparationControl(QWidget):
             main_window.updateQueueLength()
         if status != shared.FileStatus.Finished:
             self.start_button.setEnabled(True)
-            self.startSeparateSignal.emit()
+            self.startSeparateSignal.emit(True)
 
-    def startSeparation(self):
+    def startSeparation(self, no_warning=False):
         global main_window
         if not self.start_button.isEnabled():
             return
@@ -1957,7 +1957,7 @@ class SeparationControl(QWidget):
             main_window.setStatusText.emit("No more file to separate")
             separator.empty_cache()
             return
-        if "{stem}" not in main_window.save_options.loc_input.currentText():
+        if "{stem}" not in main_window.save_options.loc_input.currentText() and not no_warning:
             main_window.showWarning.emit("Warning", '"{stem}" not included in save location. May cause overwrite.')
         if main_window.save_options.encoder_group.checkedId() == 1:
             if not shared.is_sublist(["-i", "-"], shared.try_parse_cmd(main_window.save_options.command.text())):
@@ -1966,7 +1966,7 @@ class SeparationControl(QWidget):
                     'Command must contain "-i -" for ffmpeg encoder. You are not saving output audio.',
                 )
                 return
-            if "-v" not in shared.try_parse_cmd(main_window.save_options.command.text()):
+            if "-v" not in shared.try_parse_cmd(main_window.save_options.command.text()) and not no_warning:
                 main_window.showWarning.emit(
                     "Warning",
                     'Command does not contain "-v" for ffmpeg encoder. May output too much information to log file.',
