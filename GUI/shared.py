@@ -28,6 +28,7 @@ import lzma
 import ordered_set
 import pathlib
 import pickle
+import re
 import shlex
 import subprocess
 import sys
@@ -83,6 +84,15 @@ update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
 
 settingsLock = threading.Lock()
 historyLock = threading.Lock()
+
+urlreg = re.compile(
+    r"^(?P<scheme>[a-zA-Z]+)://"
+    r"(?P<authority>(?P<host>[^:/?#&=\[\]\(\)\{\}]+|\[[0-9a-fA-F:.]+\])"
+    r"(?::(?P<port>\d+))?)"
+    r"(?P<path>(?:/(?P<name>[^?#/]+)|/)*)"
+    r"(?:\?(?P<query>[^#]*))?"
+    r"(?:#(?P<anchor>.*))?$"
+)
 
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS") and sys.platform == "win32":
@@ -329,6 +339,70 @@ class FileStatus:
     Cancelled = 7
 
 
+class URL_with_filename(object):
+    def __new__(cls, url, protocols=["http", "https"], **kwargs):
+        # Verify URL
+        if (not (m := urlreg.match(url))) or m.group("scheme") not in protocols:
+            return None
+        return object.__new__(cls)
+
+    def __init__(self, url, name=None, **kwargs):
+        self._url = url
+        if name is not None:
+            self._name = name
+            self._hasname = True
+
+    def __repr__(self):
+        return "URL_with_filename(%r)" % self._url
+
+    def __str__(self):
+        return self._url
+
+    @property
+    def name(self):
+        if hasattr(self, "_hasname"):
+            return self._name
+        m = urlreg.match(self._url)
+        url_name = m["name"]
+        try:
+            logging.info("Getting file name from URL: %s" % self)
+            req = urllib.request.Request(self, method="GET")
+            u = urllib.request.urlopen(req)
+            u.close()
+            self._name = u.headers.get_filename()
+            if self._name:
+                logging.info("Found file name in header: %s" % self._name)
+                self._hasname = True
+                return self._name
+            logging.info("No file name in header, trying to get from URL")
+        except Exception:
+            logging.error("Failed to get file name from header:\n%s" % traceback.format_exc())
+        if url_name:
+            self._name = url_name
+            self._hasname = True
+            logging.info("Found file name in URL: %s" % self._name)
+            return self._name
+        logging.error("Failed to find file name in URL")
+        self._name = None
+        self._hasname = False
+        return None
+
+    @property
+    def stem(self):
+        if self.name:
+            return pathlib.Path(self.name).stem
+
+    @property
+    def suffix(self):
+        if self.name:
+            return pathlib.Path(self.name).suffix
+
+    @property
+    def suffixes(self):
+        if self.name:
+            return pathlib.Path(self.name).suffixes
+
+
 def Popen(*args, **kwargs):
     """A wrapper of `subprocess.Popen` to hide console window on Windows and redirect stdout and stderr to PIPE"""
     if sys.platform == "win32":
@@ -355,6 +429,7 @@ def thread_wrapper(*args_thread, **kw_thread):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             thread_wrapper.index += 1
+            stack = "".join(traceback.format_list(traceback.extract_stack()[:-1]))
 
             def run_and_log(idx=thread_wrapper.index):
                 logging.info(
@@ -364,8 +439,14 @@ def thread_wrapper(*args_thread, **kw_thread):
                     func(*args, **kwargs)
                 except Exception:
                     logging.error(
-                        "[%d] Thread %s (%s) failed:\n%s"
-                        % (idx, func.__name__, pathlib.Path(func.__code__.co_filename).name, traceback.format_exc())
+                        "[%d] Thread %s (%s) failed:\n%s%s"
+                        % (
+                            idx,
+                            func.__name__,
+                            pathlib.Path(func.__code__.co_filename).name,
+                            stack,
+                            traceback.format_exc(),
+                        )
                     )
                 finally:
                     logging.info(

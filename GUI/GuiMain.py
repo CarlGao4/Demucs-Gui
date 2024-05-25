@@ -1,4 +1,4 @@
-__version__ = "1.2"
+__version__ = "1.2.1a1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Carl Gao, Jize Guo, Rosario S.E.
@@ -1276,6 +1276,9 @@ class FileQueue(QWidget):
         self.table.horizontalHeaderItem(1).setToolTip("Toggle animation")
         self.table.horizontalHeader().sectionClicked.connect(self.tableHeaderClicked)
 
+        self.delegate = ProgressDelegate()
+        self.table.setItemDelegateForColumn(1, self.delegate)
+
         self.add_folder_button = QPushButton()
         self.add_folder_button.setText("Add folder")
         self.add_folder_button.clicked.connect(
@@ -1289,6 +1292,14 @@ class FileQueue(QWidget):
                 QFileDialog.getOpenFileNames(main_window, "Add files to queue", filter=separator.audio.format_filter)[0]
             )
         )
+
+        self.add_urls_button = QPushButton()
+        self.add_urls_button.setText("Add URLs")
+        self.add_urls_button.clicked.connect(self.addUrl)
+
+        self.select_all_button = QPushButton()
+        self.select_all_button.setText("Select all")
+        self.select_all_button.clicked.connect(self.selectAll)
 
         self.remove_files_button = QPushButton()
         self.remove_files_button.setText("Remove")
@@ -1308,13 +1319,15 @@ class FileQueue(QWidget):
         self.move_top_button.clicked.connect(self.moveTop)
 
         self.widget_layout = QGridLayout()
-        self.widget_layout.addWidget(self.table, 0, 0, 1, 3)
+        self.widget_layout.addWidget(self.table, 0, 0, 1, 4)
         self.widget_layout.addWidget(self.add_folder_button, 1, 0)
         self.widget_layout.addWidget(self.add_files_button, 1, 1)
-        self.widget_layout.addWidget(self.remove_files_button, 1, 2)
-        self.widget_layout.addWidget(self.pause_button, 2, 0)
-        self.widget_layout.addWidget(self.resume_button, 2, 1)
-        self.widget_layout.addWidget(self.move_top_button, 2, 2)
+        self.widget_layout.addWidget(self.add_urls_button, 1, 2)
+        self.widget_layout.addWidget(self.remove_files_button, 1, 3)
+        self.widget_layout.addWidget(self.select_all_button, 2, 0)
+        self.widget_layout.addWidget(self.pause_button, 2, 1)
+        self.widget_layout.addWidget(self.resume_button, 2, 2)
+        self.widget_layout.addWidget(self.move_top_button, 2, 3)
 
         self.setLayout(self.widget_layout)
 
@@ -1375,8 +1388,6 @@ class FileQueue(QWidget):
                         self.table.setItem(row, 0, QTableWidgetItem(str(file)))
                     else:
                         self.table.setItem(row, 0, QTableWidgetItem(file.name))
-                    delegate = ProgressDelegate()
-                    self.table.setItemDelegateForColumn(1, delegate)
                     self.table.setItem(row, 1, QTableWidgetItem())
                     self.table.item(row, 0).setToolTip(str(file))
                     self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
@@ -1387,6 +1398,49 @@ class FileQueue(QWidget):
                 if main_window.param_settings.separate_once_added.isChecked():
                     main_window.separation_control.start_button.click()
                 main_window.updateQueueLength()
+
+    def addUrl(self):
+        global main_window
+        urls, ok = QInputDialog.getMultiLineText(
+            main_window,
+            "Add URLs",
+            "Enter URLs to add to the queue, one per line\n"
+            "You can specify the filename by separating file name and URL with a space\n"
+            "Example: filename https://example.com/file.mp3",
+        )
+        if not ok:
+            return
+        for line in map(str.strip, urls.splitlines()):
+            if not line:
+                continue
+            if " " in line:
+                name, url = line.rsplit(" ", 1)
+                url = shared.URL_with_filename(url, name=name.strip(), protocols=separator.audio.ffmpeg_protocols)
+            else:
+                url = shared.URL_with_filename(line, protocols=separator.audio.ffmpeg_protocols)
+            with file_queue_lock:
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                if row == 500:
+                    main_window.showWarning.emit(
+                        "Queue too long",
+                        "You have added more than 500 files to the queue. This may cause performance issues. "
+                        "You may switch to other tabs or minimize the window to reduce the impact.",
+                    )
+                if self.show_full_path:
+                    self.table.setItem(row, 0, QTableWidgetItem(str(url)))
+                else:
+                    self.table.setItem(row, 0, QTableWidgetItem("%s [URL]" % url.name))
+                self.table.setItem(row, 1, QTableWidgetItem())
+                self.table.item(row, 0).setToolTip(str(url))
+                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, url)
+                self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
+                self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
+                self.queue_length += 1
+            if main_window.param_settings.separate_once_added.isChecked():
+                main_window.separation_control.start_button.click()
+            main_window.updateQueueLength()
 
     def tableHeaderClicked(self, index):
         match index:
@@ -1414,7 +1468,14 @@ class FileQueue(QWidget):
         else:
             for i in range(self.table.rowCount()):
                 item = self.table.item(i, 0)
-                item.setText(item.data(Qt.ItemDataRole.UserRole).name)
+                if isinstance(p := item.data(Qt.ItemDataRole.UserRole), pathlib.Path):
+                    item.setText(p.name)
+                elif isinstance(p, shared.URL_with_filename):
+                    item.setText("%s [URL]" % p.name)
+
+    def selectAll(self):
+        self.table.selectAll()
+        self.table.setFocus()
 
     def removeFiles(self):
         indexes = sorted(list(set(i.row() for i in self.table.selectedIndexes())), reverse=True)

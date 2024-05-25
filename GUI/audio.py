@@ -17,6 +17,7 @@
 import io
 import logging
 import os
+import pathlib
 import shlex
 import shutil
 import soundfile
@@ -39,10 +40,12 @@ logging.info("libsoxr version: %s" % soxr.__libsoxr_version__)
 ffmpeg_available = False
 
 format_filter = "libsndfile (%s)" % " ".join(f"*.{format}".lower() for format in soundfile.available_formats().keys())
+ffmpeg_protocols = set()
 
 
 def checkFFMpeg():
     try:
+        global ffmpeg_available, format_filter, ffmpeg_protocols
         p = shared.Popen(["ffmpeg", "-version"])
         out, _ = p.communicate()
         out = out.decode()
@@ -53,7 +56,27 @@ def checkFFMpeg():
         out = out.decode()
         logging.info("Using ffmpeg from %s" % shutil.which("ffmpeg"))
         logging.info("ffprobe -version output:\n" + out)
-        global ffmpeg_available, format_filter
+        p = shared.Popen(["ffmpeg", "-protocols"])
+        out, _ = p.communicate()
+        out = out.decode().splitlines()
+        while not out[0].startswith("Input:"):
+            out = out[1:]
+        for line in out[1:]:
+            if not line.startswith(" "):
+                break
+            ffmpeg_protocols.add(line.strip())
+        p = shared.Popen(["ffprobe", "-protocols"])
+        out, _ = p.communicate()
+        out = out.decode().splitlines()
+        while not out[0].startswith("Input:"):
+            out = out[1:]
+        ffprobe_protocols = set()
+        for line in out[1:]:
+            if not line.startswith(" "):
+                break
+            ffprobe_protocols.add(line.strip())
+        ffmpeg_protocols &= ffprobe_protocols
+        logging.info("FFmpeg protocols: %s" % ", ".join(sorted(ffmpeg_protocols)))
         ffmpeg_available = True
         format_filter += ";;All types (*.*)"
         return ffmpeg_version
@@ -63,11 +86,14 @@ def checkFFMpeg():
 
 
 def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
-    logging.debug("Reading audio with soundfile: %s" % file)
-    try:
-        return read_audio_soundfile(file, target_sr, update_status)
-    except Exception:
-        logging.error("Failed to read with soundfile:\n" + traceback.format_exc())
+    if not isinstance(file, pathlib.Path):
+        logging.info("Not local path, skipping soundfile reader")
+    else:
+        logging.debug("Reading audio with soundfile: %s" % file)
+        try:
+            return read_audio_soundfile(file, target_sr, update_status)
+        except Exception:
+            logging.error("Failed to read with soundfile:\n" + traceback.format_exc())
     logging.debug("Reading audio with ffmpeg: %s" % file)
     try:
         return read_audio_ffmpeg(file, target_sr, update_status)
