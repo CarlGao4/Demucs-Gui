@@ -114,6 +114,7 @@ import platform
 import pprint
 import psutil
 import random
+import re
 import shlex
 import subprocess
 import sys
@@ -1239,6 +1240,7 @@ class SaveOptions(QGroupBox):
 
 class FileQueue(QWidget):
     widget_title = "File queue (%d)"
+    new_url_event = threading.Event()
 
     def __init__(self):
         global main_window
@@ -1336,6 +1338,10 @@ class FileQueue(QWidget):
         self.repaint_timer.timeout.connect(self.paint_table_progress)
         self.toggleAnimation(True)
 
+        self.new_url_event.clear()
+        self.loadURLname_queue = []
+        self.loadURLname_thread()
+
         self.queue_length = 0
 
     def table_dragEnterEvent(self, event):
@@ -1400,14 +1406,38 @@ class FileQueue(QWidget):
                     main_window.separation_control.start_button.click()
                 main_window.updateQueueLength()
 
+    @shared.thread_wrapper(daemon=True)
+    def loadURLname_thread(self):
+        while True:
+            self.new_url_event.wait()
+            self.new_url_event.clear()
+            while self.loadURLname_queue:
+                item = self.loadURLname_queue.pop(0)  # type: QTableWidgetItem
+                url = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(url, shared.URL_with_filename):
+                    url.name
+                if self.show_full_path:
+                    item.setText(str(url))
+                else:
+                    item.setText("%s [URL]" % url.name)
+
     def addUrl(self):
         global main_window
+        default_content = ""
+        try:
+            if re.match(
+                rf"^(?:(?:.*? )?{shared.urlreg_str[1:-1]}(?:\r*\n)*)+$", clip := QApplication.clipboard().text().strip()
+            ):
+                default_content = clip
+        except Exception:
+            pass
         urls, ok = QInputDialog.getMultiLineText(
             main_window,
             "Add URLs",
             "Enter URLs to add to the queue, one per line\n"
-            "You can specify the filename by separating file name and URL with a space\n"
+            "You can specify the filename by separating file name and URL with a single space\n"
             "Example: filename https://example.com/file.mp3",
+            default_content,
         )
         if not ok:
             return
@@ -1416,9 +1446,13 @@ class FileQueue(QWidget):
                 continue
             if " " in line:
                 name, url = line.rsplit(" ", 1)
-                url = shared.URL_with_filename(url, name=name.strip(), protocols=separator.audio.ffmpeg_protocols)
+                name = re.sub(r'[/\\:?*"<>|\u0000-\u0019]', "", name.strip())
+                url = shared.URL_with_filename(url, name=name, protocols=separator.audio.ffmpeg_protocols)
             else:
                 url = shared.URL_with_filename(line, protocols=separator.audio.ffmpeg_protocols)
+                if not url["name"]:
+                    logging.error("Can't find filename in URL %s\nPlease specify the filename" % url)
+                    continue
             with file_queue_lock:
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -1428,10 +1462,9 @@ class FileQueue(QWidget):
                         "You have added more than 500 files to the queue. This may cause performance issues. "
                         "You may switch to other tabs or minimize the window to reduce the impact.",
                     )
-                if self.show_full_path:
-                    self.table.setItem(row, 0, QTableWidgetItem(str(url)))
-                else:
-                    self.table.setItem(row, 0, QTableWidgetItem("%s [URL]" % url.name))
+                self.table.setItem(row, 0, QTableWidgetItem(str(url)))
+                self.loadURLname_queue.append(self.table.item(row, 0))
+                self.new_url_event.set()
                 self.table.setItem(row, 1, QTableWidgetItem())
                 self.table.item(row, 0).setToolTip(str(url))
                 self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, url)

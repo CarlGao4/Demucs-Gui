@@ -10,13 +10,11 @@
 - `CUDA Windows 64-bit`: For Windows users with NVIDIA GPU (whose compute capability is greater than 3.5).
 - `CPU Windows 64-bit`: For Windows users without accelerators (e.g. GPU).
 - `MKL Windows 64-bit`: For Windows users with Intel GPU (Intel Arc & Intel Xe). Not recommended to users who only have integrated Intel GPU.
+- `CUDA, MKL Windows 64-bit`: For Windows users with NVIDIA GPU (whose compute capability is greater than 3.5) or Intel GPU (Intel Arc & Intel Xe).
 <!-- - `ROCm Windows 64-bit`: For Windows users with AMD GPU. -->
 - `CPU macOS 64-bit`: For macOS users with Intel CPU.
 - `CPU, MPS macOS ARM64`: For macOS users with Apple Silicon CPU. MPS acceleration is available.
 - `CPU macOS 64-bit; MPS macOS Rosetta 2`: For macOS users (Both Intel Mac and Apple Silicon Mac). You may need to install Rosetta 2 on Apple Silicon Mac. MPS acceleration is available on Apple Silicon Mac.
-<!-- - `MPS macOS ARM64`: For macOS users with Apple Silicon CPU. -->
-
-<!-- *\*Not all releases are ready for download* -->
 
 2. Extract the downloaded file
 - Windows: 7z format, can be extracted with [7-Zip](https://www.7-zip.org/). If you are using Windows 11 23H2, you can also directly extract the file with Windows Explorer.
@@ -162,6 +160,16 @@ Command: `ffmpeg -y -v level+warning -i - -i {inputpath}/{input}.{inputext} -map
 Extension: `{inputext}`
 
 Copy the first video stream of the input file and the separated audio to the output file. The output file will have the same extension as the input file. Please note that this may fail due to complex reasons. To check the actual reason, you may need to check the log file and search for FFMpeg documentation.
+
+### Load files to queue
+
+There are several ways to load files to the queue:
+1. Drag and drop files to the queue window.
+2. Click on `Add files` button to choose files.
+3. Click on `Add folder` button to choose a folder. All files in the folder (recursively) will be added to the queue.
+4. Click on `Add URLs` button to add URLs. The URLs must be direct links to the audio files. You can manually specify the file name by prepending the name to the URL separated by a space. Like `file.mp3 https://example.com/file.mp3`. If the file name is not specified, Demucs GUI will try to get the file name by reading the header of the response. If the file name can't be found, the last part of the URL will be used as the file name. File name must be specified if no path is included in the URL (Like `https://example.com/`), or the URL will be ignored. *\*New in 1.2.1a1*
+
+I didn't design the program to be able to deal with a large number of files in the queue, so I used a simpler but less efficient way to handle the queue. If you have a large number of files in the queue, the program may be slow. I've added a warning once you've added more than 500 files to the queue. (Tracked by [#50](https://github.com/CarlGao4/Demucs-Gui/issues/50))
 
 ### Some "useless" functions of separation queue
 

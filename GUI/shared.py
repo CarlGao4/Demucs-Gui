@@ -86,7 +86,7 @@ update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
 settingsLock = threading.Lock()
 historyLock = threading.Lock()
 
-urlreg = re.compile(
+urlreg_str = (
     r"^(?P<scheme>[a-zA-Z]+)://"
     r"(?P<authority>(?P<host>[^:/?#&=\[\]\(\)\{\}]+|\[[0-9a-fA-F:.]+\])"
     r"(?::(?P<port>\d+))?)"
@@ -94,6 +94,7 @@ urlreg = re.compile(
     r"(?:\?(?P<query>[^#]*))?"
     r"(?:#(?P<anchor>.*))?$"
 )
+urlreg = re.compile(urlreg_str)
 
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS") and sys.platform == "win32":
@@ -349,6 +350,7 @@ class URL_with_filename(object):
 
     def __init__(self, url, name=None, **kwargs):
         self._url = url
+        self._m = urlreg.match(url)
         if name is not None:
             self._name = name
             self._hasname = True
@@ -358,6 +360,9 @@ class URL_with_filename(object):
 
     def __str__(self):
         return self._url
+    
+    def __getitem__(self, key):
+        return self._m[key]
 
     @property
     def name(self):
@@ -365,19 +370,20 @@ class URL_with_filename(object):
             return self._name
         m = urlreg.match(self._url)
         url_name = m["name"]
-        try:
-            logging.info("Getting file name from URL: %s" % self)
-            req = urllib.request.Request(self, method="GET")
-            u = urllib.request.urlopen(req)
-            u.close()
-            self._name = u.headers.get_filename()
-            if self._name:
-                logging.info("Found file name in header: %s" % self._name)
-                self._hasname = True
-                return self._name
-            logging.info("No file name in header, trying to get from URL")
-        except Exception:
-            logging.error("Failed to get file name from header:\n%s" % traceback.format_exc())
+        if m["scheme"].lower() in {"http", "https", "ftp"}:
+            try:
+                logging.info("Getting file name from URL: %s" % self)
+                req = urllib.request.Request(self, method="GET")
+                u = urllib.request.urlopen(req)
+                u.close()
+                self._name = u.headers.get_filename()
+                if self._name:
+                    logging.info("Found file name in header: %s" % self._name)
+                    self._hasname = True
+                    return self._name
+                logging.info("No file name in header, trying to get from URL")
+            except Exception:
+                logging.error("Failed to get file name from header:\n%s" % traceback.format_exc())
         if url_name:
             self._name = url_name
             self._hasname = True
