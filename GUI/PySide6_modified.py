@@ -19,7 +19,7 @@ import shared
 
 if not shared.use_PyQt6:
     from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt
-    from PySide6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator, QTextOption
+    from PySide6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator
     from PySide6.QtWidgets import (
         QApplication,
         QLabel,
@@ -40,7 +40,7 @@ if not shared.use_PyQt6:
     )
 else:
     from PyQt6.QtCore import QModelIndex, QPersistentModelIndex, QRegularExpression, QSize, Qt  # type: ignore
-    from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator, QTextOption  # type: ignore
+    from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QRegularExpressionValidator  # type: ignore
     from PyQt6.QtWidgets import (  # type: ignore
         QApplication,
         QLabel,

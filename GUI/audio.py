@@ -39,6 +39,7 @@ logging.info("SoXR version: %s" % soxr.__version__)
 logging.info("libsoxr version: %s" % soxr.__libsoxr_version__)
 
 ffmpeg_available = False
+ffmpeg_soxr_enabled = False
 
 format_filter = "libsndfile (%s)" % " ".join(f"*.{format}".lower() for format in soundfile.available_formats().keys())
 ffmpeg_protocols = set()
@@ -46,11 +47,14 @@ ffmpeg_protocols = set()
 
 def checkFFMpeg():
     try:
-        global ffmpeg_available, format_filter, ffmpeg_protocols
+        global ffmpeg_available, format_filter, ffmpeg_protocols, ffmpeg_soxr_enabled
         p = shared.Popen(["ffmpeg", "-version"])
         out, _ = p.communicate()
         out = out.decode()
         logging.info("ffmpeg -version output:\n" + out)
+        if "libsoxr" in out:
+            ffmpeg_soxr_enabled = True
+            logging.info("SoXR enabled in FFmpeg")
         ffmpeg_version = out.strip().splitlines()[0].strip()
         p = shared.Popen(["ffprobe", "-version"])
         out, _ = p.communicate()
@@ -129,6 +133,8 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     command = ["ffmpeg", "-v", "level+warning", "-i", str(file), "-map", "a:0"]
     if target_sr is not None:
         command += ["-ar", str(target_sr)]
+        if ffmpeg_soxr_enabled:
+            command += ["-af", "aresample=resampler=soxr:precision=28"]
     command += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
     p = shared.Popen(command)
     logging.debug("ffmpeg command: %s" % shlex.join(p.args))
