@@ -107,7 +107,14 @@ Choose which device to use. If you install ROCm version, your AMD GPU will also 
 - `Relative path`: Save output files in the same location of the source file
 - `Absolute path`: Save output files directly to the path. Please remember that it must start from root dir (like `/` on *nix and `C:\` on Windows) or something unexpected will happen.
 
-You can use variables to rename your output file. Variables `{track}`, `{trackext}`, `{stem}`, `{ext}`, `{model}` will be replaced with track name without extension, track extension, stem name, default output file extension and model name.
+You can use variables to rename your output file. Available variables are:
+- `{track}`: track name without extension
+- `{trackext}`: track name with extension
+- `{stem}`: stem name
+- `{ext}`: default output file extension
+- `{model}`: model name
+- `{host}`: URL host name. If input is local file, it will be "localfile"
+- `{0}`, `{1}`, ...: input file name and its parent folder names, 0 for file name, 1 for parent folder name, and so on. You can use up to 15. If the number is greater than the actual number of parent folders, it will be empty.
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default location `separated/{model}/{track}/{stem}.{ext}` would be "separated/htdemucs/audio/vocals.flac", with the folder "separated" created under the same folder of the original audio file.
 

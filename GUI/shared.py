@@ -53,9 +53,15 @@ else:
     debug = True  # Disable log file if running from source
 
 save_loc_syntax = """\
-You can use variables to rename your output file.
-Variables "{track}", "{trackext}", "{stem}", "{ext}", "{model}" will be replaced with track name without extension, \
-track name with extension, stem name, default output file extension and model name.
+You can use variables to rename your output file. Available variables are:
+- {track}: track name without extension
+- {trackext}: track name with extension
+- {stem}: stem name
+- {ext}: default output file extension
+- {model}: model name
+- {host}: URL host name. If input is local file, it will be "localfile"
+- {0}, {1}, ...: input file name and its parent folder names, 0 for file name, 1 for parent folder name, and so on. \
+You can use up to 15. If the number is greater than the actual number of parent folders, it will be empty.
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default \
 location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/audio/vocals.flac", with the folder \
@@ -341,6 +347,23 @@ class FileStatus:
     Cancelled = 7
 
 
+def re_sub_remove_file(m: re.Match):
+    """Remove the file part in the URL, re callback function"""
+    ret = m["scheme"] + "://" + m["authority"]
+    if m["port"]:
+        ret += ":" + m["port"]
+    if m["path"]:
+        if m["name"]:
+            ret += m["path"][:-len(m["name"])]
+        else:
+            ret += m["path"]
+    if m["query"]:
+        ret += "?" + m["query"]
+    if m["anchor"]:
+        ret += "#" + m["anchor"]
+    return ret
+
+
 class URL_with_filename(object):
     def __new__(cls, url, protocols=["http", "https"], **kwargs):
         # Verify URL
@@ -351,6 +374,7 @@ class URL_with_filename(object):
     def __init__(self, url, name=None, **kwargs):
         self._url = url
         self._m = urlreg.match(url)
+        self._protocols = kwargs.get("protocols", ["http", "https"])
         if name is not None:
             self._name = name
             self._hasname = True
@@ -363,6 +387,11 @@ class URL_with_filename(object):
     
     def __getitem__(self, key):
         return self._m[key]
+    
+    def __eq__(self, other):
+        if isinstance(other, URL_with_filename):
+            return self._url == other._url
+        return False
 
     @property
     def name(self):
@@ -398,16 +427,32 @@ class URL_with_filename(object):
     def stem(self):
         if self.name:
             return pathlib.Path(self.name).stem
+        return ""
 
     @property
     def suffix(self):
         if self.name:
             return pathlib.Path(self.name).suffix
+        return ""
 
     @property
     def suffixes(self):
         if self.name:
             return pathlib.Path(self.name).suffixes
+        return []
+    
+    @property
+    def parent(self):
+        removed = re.sub(urlreg, re_sub_remove_file, self._url)
+        return URL_with_filename(removed, name=re.match(urlreg, removed)["name"], protocols=self._protocols)
+    
+    @property
+    def url(self):
+        return self._url
+    
+    @property
+    def protocols(self):
+        return self._protocols
 
 
 def Popen(*args, **kwargs):

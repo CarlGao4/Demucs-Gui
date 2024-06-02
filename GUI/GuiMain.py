@@ -1078,7 +1078,7 @@ class SaveOptions(QGroupBox):
                 self.encoder_ffmpeg_box.show()
 
     @shared.thread_wrapper(daemon=True)
-    def save(self, file: pathlib.Path, origin, tensor, save_func, item, finishCallback):
+    def save(self, file: pathlib.Path | shared.URL_with_filename, origin, tensor, save_func, item, finishCallback):
         global main_window
         self.saving += 1
         main_window.mixer.setEnabled(False)
@@ -1096,12 +1096,21 @@ class SaveOptions(QGroupBox):
                     )
                 case _:
                     file_ext = "wav"
+            parents = [file.name]
+            parent = file
+            while parent.parent != parent and len(parents) < 16:
+                parent = parent.parent
+                parents.append(parent.name)
+            if len(parents) < 16:
+                parents += [""] * (16 - len(parents))
             file_path_str = self.loc_input.currentText().format(
+                *parents,
                 track=file.stem,
                 trackext=file.name,
                 stem=stem,
                 ext=file_ext,
                 model=main_window.model_selector.select_combobox.currentText(),
+                host=file["host"] if isinstance(file, shared.URL_with_filename) else "localfile",
             )
             match self.location_group.checkedId():
                 case 0:
