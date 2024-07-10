@@ -249,7 +249,7 @@ class MainWindow(QMainWindow):
         )
         self.menu_about_about.setMenuRole(Action.MenuRole.NoRole)
         self.menu_about_usage = Action(
-            "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/usage.md")
+            "Usage", self, lambda: webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/usage.md")
         )
         self.menu_clear_history = Action("Clear history (including mixer presets)", self, self.clear_history)
         self.menu_clear_location = Action(
@@ -578,7 +578,7 @@ class MainWindow(QMainWindow):
             while True:
                 m.exec()
                 if m.clickedButton() == doc_button:
-                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/develop/MKL-AOT.md")
+                    webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/MKL-AOT.md")
                 elif m.clickedButton() == close_button:
                     break
                 else:
