@@ -2,7 +2,7 @@
 
 # demucs>=4.1.0a2
 git+https://github.com/adefossez/demucs.git  # Use git repo as it 4.1.0 hasn't been pushed to PyPI
-numpy
+numpy<2
 psutil>=5.7.0
 pyperclip
 PySide6
