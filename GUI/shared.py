@@ -52,6 +52,9 @@ if not (homeDir.parent / ".git").exists():
 else:
     debug = True  # Disable log file if running from source
 
+if os.environ.get("DGUI_DEBUG", "0") not in {"0", "no", "false"}:
+    debug = True
+
 save_loc_syntax = """\
 You can use variables to rename your output file. Available variables are:
 - {track}: track name without extension
