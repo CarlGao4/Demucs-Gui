@@ -17,3 +17,4 @@ mkl
 mkl-dpcpp
 certifi
 diffq>=0.2.1
+more-itertools

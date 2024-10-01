@@ -19,7 +19,9 @@ import sys
 
 assert sys.platform == "win32"
 
+import json
 import logging
+import more_itertools
 import re
 
 import shared
@@ -197,15 +199,49 @@ AOT_links = {
 
 gpus = []
 has_Intel = False
-p = shared.Popen(["wmic", "path", "win32_videocontroller", "get", "name,pnpdeviceid"])
-parse_re = re.compile(
-    r"(?P<name>.+?)\s+[Pp][Cc][Ii]\\[Vv][Ee][Nn]_(?P<vendor>[0-9A-Fa-f]{4})&[Dd][Ee][Vv]_(?P<device>[0-9A-Fa-f]{4})"
-)
-for line in p.communicate()[0].decode().splitlines():
-    m = parse_re.match(line)
+try:
+    out_lines = (
+        shared.Popen(
+            [
+                "pwsh",
+                "-ExecutionPolicy",
+                "RemoteSigned",
+                "-Command",
+                "try { $gpu = Get-WmiObject -Class Win32_VideoController } "
+                "catch { $gpu = Get-CimInstance -ClassName Win32_VideoController }; "
+                "foreach ($i in $gpu) { $i.Name; $i.PNPDeviceID; $i.DriverVersion }",
+            ]
+        )
+        .communicate()[0]
+        .decode()
+        .splitlines()
+    )
+except FileNotFoundError:
+    out_lines = (
+        shared.Popen(
+            [
+                "powershell",
+                "-ExecutionPolicy",
+                "RemoteSigned",
+                "-Command",
+                "try { $gpu = Get-WmiObject -Class Win32_VideoController } "
+                "catch { $gpu = Get-CimInstance -ClassName Win32_VideoController }; "
+                "foreach ($i in $gpu) { $i.Name; $i.PNPDeviceID; $i.DriverVersion }",
+            ]
+        )
+        .communicate()[0]
+        .decode()
+        .splitlines()
+    )
+if len(out_lines) % 3 != 0:
+    logging.error("Failed to get GPU information. Output:")
+    logging.error(json.dumps(out_lines, indent=4))
+parse_re = re.compile(r"[Pp][Cc][Ii]\\[Vv][Ee][Nn]_(?P<vendor>[0-9A-Fa-f]{4})&[Dd][Ee][Vv]_(?P<device>[0-9A-Fa-f]{4})")
+for gpu in more_itertools.sliced(out_lines, 3):
+    m = parse_re.match(gpu[1])
     if m is not None:
-        gpus.append((m["name"], m["vendor"].upper(), m["device"].upper()))
-        logging.info("Found GPU: %s (%s:%s)" % (m["name"], m["vendor"], m["device"]))
+        gpus.append((gpu[0], m["vendor"].upper(), m["device"].upper(), gpu[2]))
+        logging.info("Found GPU: %s (%s:%s) Driver version %s" % (gpu[0], m["vendor"], m["device"], gpu[2]))
         if m["vendor"] == "8086":
             has_Intel = True
 
