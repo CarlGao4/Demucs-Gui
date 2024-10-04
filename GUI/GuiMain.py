@@ -283,11 +283,33 @@ class MainWindow(QMainWindow):
         self.menubar.addAction(self.menu_about.menuAction())
 
         if shared.debug:
+            self.code_input_window = QWidget()
+            self.code_edit = ExpandingQPlainTextEdit()
+            self.code_edit.setPlaceholderText("Enter code here")
+            self.code_edit.setFont(QtGui.QFont("Courier New", 10))
+            self.code_edit.setMinimumHeight(200)
+            self.code_run = QPushButton("Run")
+            self.code_run.clicked.connect(self.runCode)
+            self.code_run.setToolTip("Ctrl+Return")
+            self.code_layout = QVBoxLayout()
+            self.code_layout.addWidget(self.code_edit)
+            self.code_layout.addWidget(self.code_run)
+            self.code_input_window.setLayout(self.code_layout)
+            self.code_input_window.setWindowTitle("Run code")
+            self.code_input_window.setWindowIcon(QtGui.QIcon("./icon/icon.ico"))
+            self.code_input_window.closeEvent = lambda event: self.code_input_window.hide()
+            self.code_input_window.focusPolicy = Qt.FocusPolicy.StrongFocus
+            self.code_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self.code_input_window)
+            self.code_shortcut.activated.connect(self.runCode)
+            self.code_shortcut.setAutoRepeat(False)
+
             self.menu_debug = QMenu("Debug")
             self.menu_debug_settings = Action("Print settings", self, self.printSettings)
             self.menu_debug_history = Action("Print history", self, self.printHistory)
+            self.menu_run_code = Action("Run code", self, self.showRunCodeWindow)
             self.menu_debug.addAction(self.menu_debug_settings)
             self.menu_debug.addAction(self.menu_debug_history)
+            self.menu_debug.addAction(self.menu_run_code)
             self.menubar.addAction(self.menu_debug.menuAction())
 
         self.setMenuBar(self.menubar)
@@ -374,6 +396,14 @@ class MainWindow(QMainWindow):
 
     def printHistory(self):
         pprint.pprint(shared.history, sort_dicts=False, stream=sys.stderr)
+
+    def showRunCodeWindow(self):
+        self.code_input_window.show()
+        self.code_input_window.activateWindow()
+        self.code_input_window.raise_()
+
+    def runCode(self):
+        exec(self.code_edit.toPlainText())
 
     @property
     def status_prefix(self):
