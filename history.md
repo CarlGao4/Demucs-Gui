@@ -1,5 +1,25 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.3a1*
+Release date: Oct. 5, 2024
+
+#### Updates
+1. Allow adding URL(s) as input, which will uses FFMpeg to read the audio
+2. Automatically fill in the clipboard if you've copied a URL
+3. Will use SoXR VHQ resampler as default when using FFMpeg to read audio
+4. Added `{host}` and `{0}`, `{1}`, ... to the output file name variables (refer to [usage](usage.md#save-file-location) for more details)
+5. Allow enabling debug using environment variable
+6. Added a simple debug console
+7. Added support for Intel Extension for PyTorch `2.1.40+xpu`
+8. Allow changing options and retry when failed to save output audio
+
+#### Fixes
+1. Will open AOT documentation on the main branch instead of develop branch
+2. No longer relies on wmic to get GPU information as Windows 11 24H2 has removed it. Used PowerShell to call `Get-CimInstance` instead
+
+#### Known issues
+1. CPU usage will stuck at 100% when separating, even running on GPU
+
 ### 1.2
 Release date: May. 18, 2024
 
