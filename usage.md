@@ -113,8 +113,8 @@ You can use variables to rename your output file. Available variables are:
 - `{stem}`: stem name
 - `{ext}`: default output file extension
 - `{model}`: model name
-- `{host}`: URL host name. If input is local file, it will be "localfile"
-- `{0}`, `{1}`, ...: input file name and its parent folder names, 0 for file name, 1 for parent folder name, and so on. You can use up to 15. If the number is greater than the actual number of parent folders, it will be empty.
+- `{host}`: URL host name. If input is local file, it will be "localfile" *\*New in 1.3a1*
+- `{0}`, `{1}`, ...: input file name and its parent folder names, 0 for file name, 1 for parent folder name, and so on. You can use up to 15. If the number is greater than the actual number of parent folders, it will be empty. *\*New in 1.3a1*
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default location `separated/{model}/{track}/{stem}.{ext}` would be "separated/htdemucs/audio/vocals.flac", with the folder "separated" created under the same folder of the original audio file.
 
@@ -168,13 +168,21 @@ Extension: `{inputext}`
 
 Copy the first video stream of the input file and the separated audio to the output file. The output file will have the same extension as the input file. Please note that this may fail due to complex reasons. To check the actual reason, you may need to check the log file and search for FFMpeg documentation.
 
+### Allow retry saving on error *\*New in 1.3a1*
+
+If this option is checked, Demucs GUI will ask you whether to retry saving the separated audio if an error occurs. If you choose to retry, current separation will be paused and the program will wait for your response.
+
+After you choose to retry, most parts of the window will be disabled. But you can change your save options and mixer settings. Error message would be shown in the dialog asking whether to retry, you can also check the log file for more information. After you've changed your settings, click on `Retry` button to retry saving.
+
+If you choose to cancel, the current separation will be discarded and the program will continue to the next separation.
+
 ### Load files to queue
 
 There are several ways to load files to the queue:
 1. Drag and drop files to the queue window.
 2. Click on `Add files` button to choose files.
 3. Click on `Add folder` button to choose a folder. All files in the folder (recursively) will be added to the queue.
-4. Click on `Add URLs` button to add URLs. The URLs must be direct links to the audio files. You can manually specify the file name by prepending the name to the URL separated by a space. Like `file.mp3 https://example.com/file.mp3`. If the file name is not specified, Demucs GUI will try to get the file name by reading the header of the response. If the file name can't be found, the last part of the URL will be used as the file name. File name must be specified if no path is included in the URL (Like `https://example.com/`), or the URL will be ignored. *\*New in 1.2.1a1*
+4. Click on `Add URLs` button to add URLs. The URLs must be direct links to the audio files. You can manually specify the file name by prepending the name to the URL separated by a space. Like `file.mp3 https://example.com/file.mp3`. If the file name is not specified, Demucs GUI will try to get the file name by reading the header of the response. If the file name can't be found, the last part of the URL will be used as the file name. File name must be specified if no path is included in the URL (Like `https://example.com/`), or the URL will be ignored. *\*New in 1.3a1*
 
 I didn't design the program to be able to deal with a large number of files in the queue, so I used a simpler but less efficient way to handle the queue. If you have a large number of files in the queue, the program may be slow. I've added a warning once you've added more than 500 files to the queue. (Tracked by [#50](https://github.com/CarlGao4/Demucs-Gui/issues/50))
 
