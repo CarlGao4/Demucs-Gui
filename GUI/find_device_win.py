@@ -151,9 +151,109 @@ PCI_Mappings = {
         "12.70.4": {"7D40", "7D45", "7D60", "7D67"},
         "12.71.4": {"7D55", "7DD5"},
     },
+    "2.1.40": {
+            "12.0.0": {"9A40", "9A49", "9A59", "9A60", "9A68", "9A70", "9A78", "FF20"},
+            "12.1.0": {"4C80", "4C8A", "4C8B", "4C8C", "4C90", "4C9A"},
+            "12.2.0": {
+                "4680",
+                "4682",
+                "4688",
+                "468A",
+                "468B",
+                "4690",
+                "4692",
+                "4693",
+                "A780",
+                "A781",
+                "A782",
+                "A783",
+                "A788",
+                "A789",
+                "A78A",
+                "A78B",
+            },
+            "12.3.0": {
+                "4626",
+                "4628",
+                "462A",
+                "46A0",
+                "46A1",
+                "46A2",
+                "46A3",
+                "46A6",
+                "46A8",
+                "46AA",
+                "46B0",
+                "46B1",
+                "46B2",
+                "46B3",
+                "46C0",
+                "46C1",
+                "46C2",
+                "46C3",
+                "A720",
+                "A721",
+                "A7A0",
+                "A7A1",
+                "A7A8",
+                "A7A9",
+                "A7AA",
+                "A7AB",
+                "A7AC",
+                "A7AD",
+            },
+            "12.4.0": {"46D0", "46D1", "46D2", "46D3", "46D4"},
+            "12.10.0": {"4905", "4906", "4907", "4908", "4909"},
+            "12.55.8": {
+                "4F80",
+                "4F81",
+                "4F82",
+                "4F83",
+                "4F84",
+                "5690",
+                "5691",
+                "5692",
+                "56A0",
+                "56A1",
+                "56A2",
+                "56BE",
+                "56BF",
+                "56C0",
+                "56C2",
+            },
+            "12.56.5": {
+                "4F87",
+                "4F88",
+                "5693",
+                "5694",
+                "5695",
+                "56A5",
+                "56A6",
+                "56B0",
+                "56B1",
+                "56BA",
+                "56BB",
+                "56BC",
+                "56BD",
+                "56C1",
+            },
+            "12.57.0": {"4F85", "4F86", "5696", "5697", "56A3", "56A4", "56B2", "56B3"},
+            "12.60.7": {"0BD0", "0B69", "0B6E", "0BD5", "0BD6", "0BD7", "0BD8", "0BD9", "0BDA", "0BDB"},
+            "12.61.7": {"0BD4"},
+            "12.70.4": {"7D40", "7D41", "7D45", "7D60", "7D67"},
+            "12.71.4": {"7D55", "7DD5"},
+            "12.74.4": {"7D51", "7DD1"},
+            "20.1.4": {"E202", "E20B", "E20C", "E20D", "E20E", "E20F", "E212"},
+            "20.2.0": {"E220", "E221", "E222"},
+            "20.4.4": {"6420", "64A0", "64B0"},
+    },
 }
 
-AOT_link_fmt = "https://www.fosshub.com/Demucs-GUI-old.html?dwl={file}"
+AOT_link_fmt = {
+    "2.1.10": "https://www.fosshub.com/Demucs-GUI-old.html?dwl={file}",
+    "2.1.30": "https://www.fosshub.com/Demucs-GUI-old.html?dwl={file}",
+    "2.1.40": "https://github.com/CarlGao4/ipex-wheel/releases/download/v2.1.40%2Bxpu-cp311/2.1.40+xpu-AOT.7z",
+}
 AOT_links = {
     "2.1.10": {
         "12.0.0": "12.0.0_tgl_tgllp.7z",
@@ -197,7 +297,7 @@ AOT_links = {
     },
 }
 
-gpus = []
+gpus = []  # List of tuples (name, vendor, device, driver_version)
 has_Intel = False
 try:
     out_lines = (
@@ -261,120 +361,17 @@ def is_intel_supported(vendor, device, ipex_version="2.1.10"):
 
 
 def get_download_link(version, ipex_version="2.1.10"):
-    if ipex_version not in AOT_links:
+    if ipex_version not in AOT_link_fmt:
         return None
-    if version in AOT_links[ipex_version]:
-        return AOT_link_fmt.format(file=AOT_links[ipex_version][version])
-    return None
+    return AOT_link_fmt[ipex_version].format(file=AOT_links.get(ipex_version, {}).get(version, ""))
 
 
 def ipex_version_available(ipex_version="2.1.10"):
-    return ipex_version in PCI_Mappings and ipex_version in AOT_links
+    return ipex_version in PCI_Mappings
 
-
-# I attach a copy of the first version of this list below
 
 # These mappings come from the following websites:
 # https://dgpu-docs.intel.com/devices/hardware-table.html
 # https://pci-ids.ucw.cz/read/PC/8086
 # https://en.wikipedia.org/wiki/List_of_Intel_graphics_processing_units
 # https://github.com/GameTechDev/gpudetect/blob/master/IntelGfx.cfg
-# IDs listed in the first map comes from official Intel documentation (first link above)
-# IDs listed in the second map comes from other sources
-
-# I made this list based on my understanding of the documentation, so it may not be accurate
-# You may need to try to find the correct one if it runs really slow on your Intel GPU
-
-# PCI_Mappings = {
-#     "12.0.0": [{"9A78", "9AC0", "9AC9", "9AD9", "9AF8", "9A40", "9A49", "9A59", "9A60", "9A68", "9A70"}, {"9A7F"}],
-#     "12.1.0": [{"4C8A", "4C8B", "4C90", "4C9A", "4C8C", "4C80"}, set()],
-#     "12.2.0": [
-#         {
-#             "4680",
-#             "4682",
-#             "4688",
-#             "468A",
-#             "468B",
-#             "4690",
-#             "4692",
-#             "4693",
-#             "A78B",
-#             "A78A",
-#             "A789",
-#             "A788",
-#             "A783",
-#             "A782",
-#             "A781",
-#             "A780",
-#         },
-#         set(),
-#     ],
-#     "12.3.0": [
-#         {
-#             "4626",
-#             "4628",
-#             "462A",
-#             "46A0",
-#             "46A1",
-#             "46A2",
-#             "46A3",
-#             "46A6",
-#             "46A8",
-#             "46AA",
-#             "46B0",
-#             "46B1",
-#             "46B2",
-#             "46B3",
-#             "46C0",
-#             "46C1",
-#             "46C2",
-#             "46C3",
-#             "A7A9",
-#             "A7A8",
-#             "A7A1",
-#             "A7A0",
-#             "A721",
-#             "A720",
-#         },
-#         {"4636", "4638", "463A", "46B6", "46B8", "46BA", "A7AA", "A7AB", "A7AC", "A7AD"},
-#     ],
-#     "12.4.0": [{"46D0", "46D1", "46D2"}, set()],
-#     "12.10.0": [{"4905", "4907"}, {"4906", "4908", "4909"}],
-#     "12.55.0": [set(), set()],
-#     "12.55.1": [set(), set()],
-#     "12.55.4": [set(), set()],
-#     "12.55.8": [set(), {"56A2", "56A1", "56A0", "5692", "5691", "5690"}],
-#     "12.56.0": [set(), set()],
-#     "12.56.4": [set(), set()],
-#     "12.56.5": [set(), {"56A6", "56A5", "5694", "5693", "56B0", "56B1"}],
-#     "12.57.0": [set(), {"5697", "5696", "56B3", "56B2"}],
-#     "12.58.0": [set(), set()],
-#     "12.59.0": [set(), set()],
-# }
-
-# Supported_But_Unknown = [
-#     {
-#         "4571",
-#         "4557",
-#         "4555",
-#         "4551",
-#         "4541",
-#         "4E71",
-#         "4E61",
-#         "4E57",
-#         "4E55",
-#         "4E51",
-#         "56B3",
-#         "56B2",
-#         "56A4",
-#         "56A3",
-#         "5697",
-#         "5696",
-#         "5695",
-#         "56B1",
-#         "56B0",
-#         "56C1",
-#         "56C0",
-#     },
-#     {"5698", "56A7", "56A8", "56A9"},
-# ]

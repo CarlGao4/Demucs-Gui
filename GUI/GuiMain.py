@@ -1,4 +1,4 @@
-__version__ = "1.2.1a1"
+__version__ = "1.3a1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Demucs-GUI developers
@@ -563,12 +563,23 @@ class MainWindow(QMainWindow):
         else:
             prompt = ""
             warn = False
-        if len(intel_gpus) == 1:
-            gpu_name, gpu_ver = intel_gpus[0]
+        intel_gpu_links = {}  # {link: [gpu_ver, ...]}
+        for i in intel_gpus:
+            if link := find_device_win.get_download_link(i[1], ipex_version):
+                if link not in intel_gpu_links:
+                    intel_gpu_links[link] = []
+                intel_gpu_links[link].append(i[1])
+        if len(intel_gpu_links) == 1:
             m = QMessageBox(self)
             m.setWindowTitle("About AOT")
-            prompt += "Found supported Intel GPU: %s (%s)\n" % (gpu_name, gpu_ver)
-            prompt += "Do you want to download the AOT version for this GPU or open AOT documentation?"
+            prompt += "Found %d supported Intel GPUs:\n" % len(intel_gpus)
+            for idx, i in enumerate(intel_gpus):
+                prompt += "%d. %s (Version: %s)\n" % (idx + 1, i[0], i[1])
+            prompt += "\nDo you want to download the AOT version or open AOT documentation?"
+            prompt += (
+                "\n\nNote: The downloaded file may contain multiple versions of AOT for different GPUs, "
+                "please choose the correct version shown above."
+            )
             m.setText(prompt)
             download_button = m.addButton("Download", m.ButtonRole.ActionRole)
             doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
@@ -581,23 +592,24 @@ class MainWindow(QMainWindow):
             while True:
                 m.exec()
                 if m.clickedButton() == download_button:
-                    webbrowser.open(find_device_win.get_download_link(gpu_ver, ipex_version))
+                    webbrowser.open(next(iter(intel_gpu_links)))
                 elif m.clickedButton() == doc_button:
                     webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/blob/main/MKL-AOT.md")
                 else:
                     break
         else:
-            gpu_vers = set(i[1] for i in intel_gpus)
             m = QMessageBox(self)
             m.setWindowTitle("About AOT")
             prompt += "Found %d supported Intel GPUs:\n" % len(intel_gpus)
             for idx, i in enumerate(intel_gpus):
-                prompt += "%d. %s (%s)\n" % (idx + 1, i[0], i[1])
+                prompt += "%d. %s (Version: %s)\n" % (idx + 1, i[0], i[1])
             prompt += "\nDo you want to download the AOT version for one of these GPUs or open AOT documentation?"
             m.setText(prompt)
             download_buttons = []
-            for i in gpu_vers:
-                download_buttons.append((i, m.addButton("Download for %s" % i, m.ButtonRole.ActionRole)))
+            for link, versions in intel_gpu_links.items():
+                download_buttons.append(
+                    (link, m.addButton("Download for %s" % (", ".join(versions)), m.ButtonRole.ActionRole))
+                )
             doc_button = m.addButton("Open documentation", m.ButtonRole.ActionRole)
             close_button = m.addButton(m.StandardButton.Close)
             m.setDefaultButton(doc_button)
@@ -614,7 +626,7 @@ class MainWindow(QMainWindow):
                 else:
                     for i in download_buttons:
                         if m.clickedButton() == i[1]:
-                            webbrowser.open(find_device_win.get_download_link(i[0], ipex_version))
+                            webbrowser.open(i[0], ipex_version)
                             break
 
 
@@ -2175,7 +2187,7 @@ if __name__ == "__main__":
         app = QApplication([])
         msgbox = QMessageBox()
         msgbox.setIcon(QMessageBox.Icon.Critical)
-        msgbox.setText("Failed to initialize log file. ")
+        msgbox.setText("Failed to initialize log file. \n" + traceback.format_exc())
         msgbox.setWindowTitle("Demucs GUI start failed")
         msgbox.exec()
         raise SystemExit(1)
