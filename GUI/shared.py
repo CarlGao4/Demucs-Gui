@@ -42,11 +42,6 @@ homeDir = pathlib.Path(__main__.__file__).resolve().parent
 debug = False  # Do not write log file, output to console instead if True
 use_PyQt6 = False  # set to True to use PyQt6 instead of PySide6
 
-if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
-    import ctypes
-
-    ctypes.windll.kernel32.FreeConsole()
-
 if not (homeDir.parent / ".git").exists():
     os.chdir(homeDir)  # Change working directory to homeDir if not running from source
 else:
@@ -54,6 +49,11 @@ else:
 
 if os.environ.get("DGUI_DEBUG", "0") not in {"0", "no", "false"}:
     debug = True
+
+if sys.platform == "win32" and not debug and not sys.executable.endswith("python.exe"):
+    import ctypes
+
+    ctypes.windll.kernel32.FreeConsole()
 
 save_loc_syntax = """\
 You can use variables to rename your output file. Available variables are:
@@ -110,23 +110,24 @@ if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS") and sys.platform =
     # Popen should be wrapped to avoid WinError 50
     subprocess._Popen = subprocess.Popen
 
-    def wrapped_Popen(*args, **kwargs):
-        if "stdout" in kwargs and kwargs["stdout"] is not None:
-            if "stderr" not in kwargs or kwargs["stderr"] is None:
-                kwargs["stderr"] = subprocess.PIPE
-            if "stdin" not in kwargs or kwargs["stdin"] is None:
-                kwargs["stdin"] = subprocess.PIPE
-        if "stderr" in kwargs and kwargs["stderr"] is not None:
-            if "stdout" not in kwargs or kwargs["stdout"] is None:
-                kwargs["stdout"] = subprocess.PIPE
-            if "stdin" not in kwargs or kwargs["stdin"] is None:
-                kwargs["stdin"] = subprocess.PIPE
-        if "stdin" in kwargs and kwargs["stdin"] is not None:
-            if "stdout" not in kwargs or kwargs["stdout"] is None:
-                kwargs["stdout"] = subprocess.PIPE
-            if "stderr" not in kwargs or kwargs["stderr"] is None:
-                kwargs["stderr"] = subprocess.PIPE
-        return subprocess._Popen(*args, **kwargs)
+    class wrapped_Popen(subprocess._Popen):
+        def __init__(self, *args, **kwargs):
+            if "stdout" in kwargs and kwargs["stdout"] is not None:
+                if "stderr" not in kwargs or kwargs["stderr"] is None:
+                    kwargs["stderr"] = subprocess.PIPE
+                if "stdin" not in kwargs or kwargs["stdin"] is None:
+                    kwargs["stdin"] = subprocess.PIPE
+            if "stderr" in kwargs and kwargs["stderr"] is not None:
+                if "stdout" not in kwargs or kwargs["stdout"] is None:
+                    kwargs["stdout"] = subprocess.PIPE
+                if "stdin" not in kwargs or kwargs["stdin"] is None:
+                    kwargs["stdin"] = subprocess.PIPE
+            if "stdin" in kwargs and kwargs["stdin"] is not None:
+                if "stdout" not in kwargs or kwargs["stdout"] is None:
+                    kwargs["stdout"] = subprocess.PIPE
+                if "stderr" not in kwargs or kwargs["stderr"] is None:
+                    kwargs["stderr"] = subprocess.PIPE
+            super().__init__(*args, **kwargs)
 
     subprocess.Popen = wrapped_Popen
 
@@ -357,7 +358,7 @@ def re_sub_remove_file(m: re.Match):
         ret += ":" + m["port"]
     if m["path"]:
         if m["name"]:
-            ret += m["path"][:-len(m["name"])]
+            ret += m["path"][: -len(m["name"])]
         else:
             ret += m["path"]
     if m["query"]:
@@ -387,10 +388,10 @@ class URL_with_filename(object):
 
     def __str__(self):
         return self._url
-    
+
     def __getitem__(self, key):
         return self._m[key]
-    
+
     def __eq__(self, other):
         if isinstance(other, URL_with_filename):
             return self._url == other._url
@@ -443,16 +444,16 @@ class URL_with_filename(object):
         if self.name:
             return pathlib.Path(self.name).suffixes
         return []
-    
+
     @property
     def parent(self):
         removed = re.sub(urlreg, re_sub_remove_file, self._url)
         return URL_with_filename(removed, name=re.match(urlreg, removed)["name"], protocols=self._protocols)
-    
+
     @property
     def url(self):
         return self._url
-    
+
     @property
     def protocols(self):
         return self._protocols
