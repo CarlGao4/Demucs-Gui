@@ -879,12 +879,16 @@ class SepParamSettings(QGroupBox):
         self.default_button = QPushButton()
         self.default_button.setText("Restore defaults")
         self.default_button.clicked.connect(self.restoreDefaults)
+        self.default_button.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
 
         self.separate_once_added = QCheckBox()
         self.separate_once_added.setText("Separate once added")
         self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
         self.separate_once_added.setChecked(shared.GetHistory("separate_once_added", default=False))
         self.separate_once_added.stateChanged.connect(lambda x: shared.SetHistory("separate_once_added", value=x))
+        self.separate_once_added.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+
+        self.check_layout = QHBoxLayout()
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.device_label, 0, 0)
@@ -898,8 +902,9 @@ class SepParamSettings(QGroupBox):
         self.widget_layout.addWidget(self.shifts_label, 3, 0)
         self.widget_layout.addWidget(self.shifts_spinbox, 3, 1)
         self.widget_layout.addWidget(self.shifts_slider, 3, 2)
-        self.widget_layout.addWidget(self.separate_once_added, 4, 0, 1, 3)
-        self.widget_layout.addWidget(self.default_button, 5, 0, 1, 3)
+        self.check_layout.addWidget(self.separate_once_added)
+        self.check_layout.addWidget(self.default_button)
+        self.widget_layout.addLayout(self.check_layout, 4, 0, 1, 3)
 
         self.setLayout(self.widget_layout)
 
@@ -914,6 +919,9 @@ class SepParamSettings(QGroupBox):
 
 
 class SaveOptions(QGroupBox):
+    SaveLock = threading.Lock()
+    ChangeParamEvent = threading.Event()
+
     def __init__(self):
         global main_window
 
@@ -1058,9 +1066,27 @@ class SaveOptions(QGroupBox):
         self.parsed_command.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.parsed_command.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
+        self.retry_on_error = QCheckBox()
+        self.retry_on_error.setText("Allow retry saving on error")
+        self.retry_on_error.setToolTip(
+            "If saving fails, you can change some save options and retry. "
+            "Separation will be paused when waiting for your input."
+        )
+        self.retry_on_error.setChecked(shared.GetHistory("retry_on_error", default=False))
+        self.retry_on_error.stateChanged.connect(lambda x: shared.SetHistory("retry_on_error", value=x))
+        self.retry_on_error.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+
+        self.retry_button = QPushButton()
+        self.retry_button.setText("Retry")
+        self.retry_button.clicked.connect(self.ChangeParamEvent.set)
+        self.retry_button.setEnabled(False)
+
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.Shape.HLine)
+        line2.setFrameShadow(QFrame.Shadow.Sunken)
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.location_label, 0, 0, 1, 1)
@@ -1102,6 +1128,12 @@ class SaveOptions(QGroupBox):
         self.switchFFmpegPreset()
         self.saving = 0
 
+        self.widget_layout.addWidget(line2, 7, 0, 1, 3)
+        self.widget_layout.addWidget(self.retry_on_error, 8, 0, 1, 2)
+        self.widget_layout.addWidget(self.retry_button, 8, 2)
+
+        self.ChangeParamEvent.set()
+
     def browseLocation(self):
         p = QFileDialog.getExistingDirectory(self, "Browse saved file location")
         if p:
@@ -1123,77 +1155,103 @@ class SaveOptions(QGroupBox):
     def save(self, file: pathlib.Path | shared.URL_with_filename, origin, tensor, save_func, item, finishCallback):
         global main_window
         self.saving += 1
-        main_window.mixer.setEnabled(False)
         finishCallback(shared.FileStatus.Writing, item)
-        shared.AddHistory("save_location", value=self.loc_input.currentText())
-        for stem, stem_data in main_window.mixer.mix(origin, tensor):
-            if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
-                logging.warning("NaN or inf found in stem %s" % stem)
-            match self.encoder_group.checkedId():
-                case 0:
-                    file_ext = self.file_format.currentText()
-                case 1:
-                    file_ext = self.file_extension.text().format(
-                        input=file.stem, inputext=file.suffix[1:], inputpath=str(file.parent)
-                    )
-                case _:
-                    file_ext = "wav"
-            parents = [file.name]
-            parent = file
-            while parent.parent != parent and len(parents) < 16:
-                parent = parent.parent
-                parents.append(parent.name)
-            if len(parents) < 16:
-                parents += [""] * (16 - len(parents))
-            file_path_str = self.loc_input.currentText().format(
-                *parents,
-                track=file.stem,
-                trackext=file.name,
-                stem=stem,
-                ext=file_ext,
-                model=main_window.model_selector.select_combobox.currentText(),
-                host=file["host"] if isinstance(file, shared.URL_with_filename) else "localfile",
-            )
-            match self.location_group.checkedId():
-                case 0:
-                    file_path = file.parent / file_path_str
-                case 1:
-                    file_path = pathlib.Path(file_path_str)
-            match self.clip_mode.currentText():
-                case "rescale":
-                    if (peak := stem_data.abs().max()) > 0.999:
-                        data = stem_data / peak * 0.999
-                    else:
-                        data = stem_data
-                case "clamp":
-                    data = stem_data.clamp(-0.999, 0.999)
-                case "none":
-                    data = stem_data
-            try:
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                match self.encoder_group.checkedId():
-                    case 0:
-                        ret = save_func(file_path, data, self.sample_fmt.currentData(), encoder="sndfile")
-                    case 1:
-                        command = [
-                            i.format(
-                                input=file.stem,
-                                inputext=file.suffix[1:],
-                                inputpath=str(file.parent),
-                                output=str(file_path),
+        with self.SaveLock:
+            shared.AddHistory("save_location", value=self.loc_input.currentText())
+            while True:
+                main_window.mixer.setEnabled(False)
+                self.retry_button.setEnabled(False)
+                for stem, stem_data in main_window.mixer.mix(origin, tensor):
+                    if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
+                        logging.warning("NaN or inf found in stem %s" % stem)
+                    match self.encoder_group.checkedId():
+                        case 0:
+                            file_ext = self.file_format.currentText()
+                        case 1:
+                            file_ext = self.file_extension.text().format(
+                                input=file.stem, inputext=file.suffix[1:], inputpath=str(file.parent)
                             )
-                            for i in shared.try_parse_cmd(self.command.text())
-                        ]
-                        logging.info("Saving file %s with command %s" % (file_path, command))
-                        ret = save_func(command, data, encoder="ffmpeg")
-            except Exception:
-                logging.error("Failed to save file %s:\n%s" % (file_path, traceback.format_exc()))
-                ret = False
-            if ret is not None:
-                break
-        self.saving -= 1
-        if self.saving == 0:
-            main_window.mixer.setEnabled(True)
+                        case _:
+                            file_ext = "wav"
+                    parents = [file.name]
+                    parent = file
+                    while parent.parent != parent and len(parents) < 16:
+                        parent = parent.parent
+                        parents.append(parent.name)
+                    if len(parents) < 16:
+                        parents += [""] * (16 - len(parents))
+                    file_path_str = self.loc_input.currentText().format(
+                        *parents,
+                        track=file.stem,
+                        trackext=file.name,
+                        stem=stem,
+                        ext=file_ext,
+                        model=main_window.model_selector.select_combobox.currentText(),
+                        host=file["host"] if isinstance(file, shared.URL_with_filename) else "localfile",
+                    )
+                    match self.location_group.checkedId():
+                        case 0:
+                            file_path = file.parent / file_path_str
+                        case 1:
+                            file_path = pathlib.Path(file_path_str)
+                    match self.clip_mode.currentText():
+                        case "rescale":
+                            if (peak := stem_data.abs().max()) > 0.999:
+                                data = stem_data / peak * 0.999
+                            else:
+                                data = stem_data
+                        case "clamp":
+                            data = stem_data.clamp(-0.999, 0.999)
+                        case "none":
+                            data = stem_data
+                    try:
+                        file_path.parent.mkdir(parents=True, exist_ok=True)
+                        match self.encoder_group.checkedId():
+                            case 0:
+                                ret = save_func(file_path, data, self.sample_fmt.currentData(), encoder="sndfile")
+                            case 1:
+                                command = [
+                                    i.format(
+                                        input=file.stem,
+                                        inputext=file.suffix[1:],
+                                        inputpath=str(file.parent),
+                                        output=str(file_path),
+                                    )
+                                    for i in shared.try_parse_cmd(self.command.text())
+                                ]
+                                logging.info("Saving file %s with command %s" % (file_path, command))
+                                ret = save_func(command, data, encoder="ffmpeg")
+                    except Exception:
+                        logging.error("Failed to save file %s:\n%s" % (file_path, traceback.format_exc()))
+                        ret = traceback.format_exc()
+                    if ret is not None:
+                        break
+                main_window.mixer.setEnabled(True)
+                if ret is None:
+                    break
+                if self.retry_on_error.isChecked():
+                    if (
+                        main_window.exec_in_main(
+                            lambda: main_window.m.question(
+                                main_window,
+                                "Retry saving",
+                                "Saving failed. Do you want to retry? You can change some options before retrying."
+                                "\n\nError message:\n%s" % str(ret),
+                                main_window.m.StandardButton.Yes,
+                                main_window.m.StandardButton.No,
+                            )
+                        )
+                        == main_window.m.StandardButton.No
+                    ):
+                        break
+                ret = None
+                self.ChangeParamEvent.clear()
+                main_window.setStatusText.emit("Waiting for your input...")
+                self.lockOther()
+                self.retry_button.setEnabled(True)
+                self.ChangeParamEvent.wait()
+                self.unlockOther()
+            self.saving -= 1
         if ret is None:
             finishCallback(shared.FileStatus.Finished, item)
         else:
@@ -1288,6 +1346,19 @@ class SaveOptions(QGroupBox):
         self.file_extension.setText(self.preset_selector.currentData()["ext"])
         self.command.setPlainText(self.preset_selector.currentData()["command"])
 
+    def lockOther(self):
+        for i in range(main_window.tab_widget.count()):
+            if main_window.tab_widget.widget(i) not in [self.parent(), main_window.mixer]:
+                main_window.tab_widget.setTabEnabled(i, False)
+        main_window.param_settings.setEnabled(False)
+        main_window.separation_control.setEnabled(False)
+
+    def unlockOther(self):
+        for i in range(main_window.tab_widget.count()):
+            main_window.tab_widget.setTabEnabled(i, True)
+        main_window.param_settings.setEnabled(True)
+        main_window.separation_control.setEnabled(True)
+
 
 class FileQueue(QWidget):
     widget_title = "File queue (%d)"
@@ -1338,6 +1409,7 @@ class FileQueue(QWidget):
         self.add_folder_button.clicked.connect(
             lambda: self.addFiles([QFileDialog.getExistingDirectory(main_window, "Add a folder to queue")])
         )
+        self.add_folder_button.setFocusProxy(self.table)
 
         self.add_files_button = QPushButton()
         self.add_files_button.setText("Add files")
@@ -1346,31 +1418,38 @@ class FileQueue(QWidget):
                 QFileDialog.getOpenFileNames(main_window, "Add files to queue", filter=separator.audio.format_filter)[0]
             )
         )
+        self.add_files_button.setFocusProxy(self.table)
 
         self.add_urls_button = QPushButton()
         self.add_urls_button.setText("Add URLs")
         self.add_urls_button.clicked.connect(self.addUrl)
+        self.add_urls_button.setFocusProxy(self.table)
 
         self.select_all_button = QPushButton()
         self.select_all_button.setText("Select all")
         self.select_all_button.clicked.connect(self.selectAll)
+        self.select_all_button.setFocusProxy(self.table)
 
         self.remove_files_button = QPushButton()
         self.remove_files_button.setText("Remove")
         self.remove_files_button.clicked.connect(self.removeFiles)
         self.table.keyReleaseEvent = self.table_keyReleaseEvent
+        self.remove_files_button.setFocusProxy(self.table)
 
         self.pause_button = QPushButton()
         self.pause_button.setText("Pause")
         self.pause_button.clicked.connect(self.pause)
+        self.pause_button.setFocusProxy(self.table)
 
         self.resume_button = QPushButton()
         self.resume_button.setText("Resume / Retry")
         self.resume_button.clicked.connect(self.resume)
+        self.resume_button.setFocusProxy(self.table)
 
         self.move_top_button = QPushButton()
         self.move_top_button.setText("Move top")
         self.move_top_button.clicked.connect(self.moveTop)
+        self.move_top_button.setFocusProxy(self.table)
 
         self.widget_layout = QGridLayout()
         self.widget_layout.addWidget(self.table, 0, 0, 1, 4)
@@ -2046,6 +2125,7 @@ class SeparationControl(QWidget):
         if not self.not_paused.is_set():
             main_window.status_prefix = "(Paused) "
             self.not_paused.wait()
+        main_window.save_options.ChangeParamEvent.wait()
         self.setModelProgressSignal.emit(value)
 
     def setAudioProgress(self, value, item: QTableWidgetItem):
@@ -2056,6 +2136,7 @@ class SeparationControl(QWidget):
         if not self.not_paused.is_set():
             main_window.status_prefix = "(Paused) "
             self.not_paused.wait()
+        main_window.save_options.ChangeParamEvent.wait()
         self.setAudioProgressSignal.emit(value, item)
 
     def setStatusForItem(self, status, item: QTableWidgetItem):
