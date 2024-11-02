@@ -1,5 +1,19 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### *1.3b1*
+Release date: Nov. 3, 2024
+
+#### Updates
+1. Added new audio tag variables for output file name and ffmpeg command
+2. Added clip mode "tanh"
+
+#### Fixes
+1. Package issues (which means that no code changes)
+   1. Fixed an issue that models can't be loaded on macOS due to incompatible numpy version
+   2. Fixed an issue that the output audio of GPU version on Windows is full of NaNs due to PyTorch compilation issue
+   3. Fixed an issue that the GPU version on Windows can't be started due to missing DLLs
+2. Now file names retrieved from URL could be URL decoded
+
 ### *1.3a1*
 Release date: Oct. 5, 2024
 
