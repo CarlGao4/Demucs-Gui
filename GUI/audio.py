@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import io
+import json
 import logging
 import os
 import pathlib
@@ -23,6 +24,7 @@ import shlex
 import shutil
 import soundfile
 import soxr
+import tinytag
 import traceback
 import typing as tp
 
@@ -43,6 +45,29 @@ ffmpeg_soxr_enabled = False
 
 format_filter = "libsndfile (%s)" % " ".join(f"*.{format}".lower() for format in soundfile.available_formats().keys())
 ffmpeg_protocols = set()
+
+audio_tags_default = {
+    "title": "",
+    "artist": "",
+    "album": "",
+    "date": "",
+    "track": "",
+    "genre": "",
+    "comment": "",
+    "composer": "",
+    "performer": "",
+    "album_artist": "",
+    "disc": "",
+    "publisher": "",
+    "language": "",
+    "lyricist": "",
+    "conductor": "",
+    "arranger": "",
+    "engineer": "",
+    "producer": "",
+    "mixer": "",
+    "grouping": "",
+}
 
 
 def checkFFMpeg():
@@ -117,7 +142,53 @@ def read_audio_soundfile(file, target_sr=None, update_status: tp.Callable[[str],
         if callable(update_status):
             update_status("Resampling audio")
         audio = soxr.resample(audio, sr, target_sr, "VHQ")
-    return audio
+    tags = audio_tags_default.copy()
+    try:
+        tags_get = tinytag.TinyTag.get(file).as_dict()
+        tags_get.update(tags_get["extra"] or {})
+        for i in ["audio_offset", "duration", "filesize", "bitrate", "channels", "samplerate", "extra", "bitdepth"]:
+            tags_get.pop(i, None)
+        tags.update(
+            {
+                str(k).lower(): (str(v) if not isinstance(v, float) else "%.6f" % v)
+                for k, v in tags_get.items()
+                if isinstance(v, (str, int, float))
+            }
+        )
+    except Exception:
+        if not ffmpeg_available:
+            logging.error("Failed to read tags with tinytag, FFmpeg is not available, skipping tags")
+            return audio, tags
+        logging.error("Failed to read tags with tinytag, retrying with ffmpeg")
+        p = shared.Popen(
+            ["ffprobe", "-v", "level+warning", "-of", "json=c=1", "-show_streams", "-show_format", str(file)]
+        )
+        logging.debug("ffprobe command: %s" % shlex.join(p.args))
+        metadata_str = p.communicate()[0].decode()
+        if p.returncode != 0:
+            logging.error("FFprobe failed with code %d, skipping tags" % p.returncode)
+            return audio, tags
+        logging.info("ffprobe output:\n" + metadata_str)
+        try:
+            metadata = json.loads(metadata_str)
+        except json.JSONDecodeError:
+            logging.error("Failed to parse ffprobe output")
+        else:
+            tags.update(
+                {
+                    str(k).lower(): (str(v) if v is not None else "")
+                    for k, v in metadata.get("format", {}).get("tags", {}).items()
+                }
+            )
+            tags.update(
+                {
+                    str(k).lower(): str(v) if not isinstance(v, float) else "%.6f" % v
+                    for k, v in metadata.get("streams", [{}])[0].get("tags", {}).items()
+                    if isinstance(v, (str, int, float))
+                }
+            )
+    logging.info(f"Tags: {tags}")
+    return audio, tags
 
 
 def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
@@ -125,9 +196,30 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
         raise NotImplementedError("FFmpeg is not available")
     if callable(update_status):
         update_status(f"Reading file metadata: {file.name if hasattr(file, 'name') else file}")
-    p = shared.Popen(["ffprobe", "-v", "level+warning", "-of", "xml", "-show_streams", "-show_format", str(file)])
+    p = shared.Popen(["ffprobe", "-v", "level+warning", "-of", "json=c=1", "-show_streams", "-show_format", str(file)])
     logging.debug("ffprobe command: %s" % shlex.join(p.args))
-    logging.info(p.communicate()[0].decode())
+    metadata_str = p.communicate()[0].decode()
+    assert p.returncode == 0, "FFprobe failed with code %d" % p.returncode
+    logging.info("ffprobe output:\n" + metadata_str)
+    tags = audio_tags_default.copy()
+    try:
+        metadata = json.loads(metadata_str)
+    except json.JSONDecodeError:
+        logging.error("Failed to parse ffprobe output")
+    else:
+        tags.update(
+            {
+                str(k).lower(): (str(v) if v is not None else "")
+                for k, v in metadata.get("format", {}).get("tags", {}).items()
+            }
+        )
+        tags.update(
+            {
+                str(k).lower(): str(v) if not isinstance(v, float) else "%.6f" % v
+                for k, v in metadata.get("streams", [{}])[0].get("tags", {}).items()
+                if isinstance(v, (str, int, float))
+            }
+        )
     if callable(update_status):
         update_status(f"Reading audio: {file.name if hasattr(file, 'name') else file}")
     command = ["ffmpeg", "-v", "level+warning", "-i", str(file), "-map", "a:0"]
@@ -147,8 +239,9 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     wav_buffer.seek(0)
     audio, sr = soundfile.read(wav_buffer, dtype="float32", always_2d=True)
     logging.info(f"Read audio {file}: samplerate={sr} shape={audio.shape}")
+    logging.info(f"Tags: {tags}")
     assert audio.shape[0] > 0, "Audio is empty"
-    return audio
+    return audio, tags
 
 
 def save_audio_sndfile(file, audio, smp_fmt, sr, update_status: tp.Callable[[str], None] = lambda _: None):

@@ -35,6 +35,7 @@ import subprocess
 import sys
 import threading
 import traceback
+import urllib.parse
 import urllib.request
 
 
@@ -65,6 +66,12 @@ You can use variables to rename your output file. Available variables are:
 - {host}: URL host name. If input is local file, it will be "localfile"
 - {0}, {1}, ...: input file name and its parent folder names, 0 for file name, 1 for parent folder name, and so on. \
 You can use up to 15. If the number is greater than the actual number of parent folders, it will be empty.
+- {TAG}: audio tag. TAG is the tag name. Available tags are listed below. If the audio file does not have the \
+corresponding tag, it will be empty. If you know the audio file has an extra tag, you can also use it, though it \
+might not be listed here. If the audio file does not contain the extra tag, save process will fail. If a tag name is \
+used as a variable, an underscore "_" will be automatically added to the end of the tag name to avoid conflict.
+    Available example tags: title, artist, album, date, track_, genre, comment, composer, performer, album_artist, \
+disc, publisher, language, lyricist, conductor, arranger, engineer, producer, mixer, grouping
 
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default \
 location "separated/{model}/{track}/{stem}.{ext}" would be "separated/htdemucs/audio/vocals.flac", with the folder \
@@ -88,6 +95,12 @@ Available variables:
 - {inputext}: input file extension
 - {inputpath}: input file path (without file name)
 - {output}: output file full path
+- {TAG}: audio tag. TAG is the tag name. Available tags are listed below. If the audio file does not have the \
+corresponding tag, it will be empty. If you know the audio file has an extra tag, you can also use it, though it \
+might not be listed here. If the audio file does not contain the extra tag, save process will fail. If a tag name is \
+used as a variable, an underscore "_" will be automatically added to the end of the tag name to avoid conflict.
+    Available example tags: title, artist, album, date, track, genre, comment, composer, performer, album_artist, \
+disc, publisher, language, lyricist, conductor, arranger, engineer, producer, mixer, grouping
 Variables about input file above will also be replaced in file extension."""
 
 update_url = "https://api.github.com/repos/CarlGao4/Demucs-GUI/releases"
@@ -402,7 +415,7 @@ class URL_with_filename(object):
         if hasattr(self, "_hasname"):
             return self._name
         m = urlreg.match(self._url)
-        url_name = m["name"]
+        url_name = urllib.parse.unquote_plus(m["name"])
         if m["scheme"].lower() in {"http", "https", "ftp"}:
             try:
                 logging.info("Getting file name from URL: %s" % self)

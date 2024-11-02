@@ -468,7 +468,7 @@ class Separator:
             used_xpu = True
         try:
             setStatus(shared.FileStatus.Reading, item)
-            wav = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
+            wav, tags = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
             assert wav is not None
             assert (np.isnan(wav).sum() == 0) and (np.isinf(wav).sum() == 0), "Audio contains NaN or Inf"
         except Exception:
@@ -524,6 +524,6 @@ class Separator:
         finally:
             self.separator.model.to("cpu")
         logging.info("Saving separated audio...")
-        save_callback(file, wav_torch, out, self.save_callback, item, finishCallback)
+        save_callback(file, wav_torch, out, tags, self.save_callback, item, finishCallback)
         self.separating = False
         return

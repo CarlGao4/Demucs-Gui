@@ -18,3 +18,4 @@ mkl-dpcpp
 certifi
 diffq>=0.2.1
 more-itertools
+tinytag<2

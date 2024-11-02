@@ -1,4 +1,4 @@
-__version__ = "1.3a1"
+__version__ = "1.3b1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Demucs-GUI developers
@@ -121,6 +121,7 @@ import sys
 import threading
 import time
 import traceback
+import urllib.parse
 import webbrowser
 
 import separator
@@ -1152,7 +1153,9 @@ class SaveOptions(QGroupBox):
                 self.encoder_ffmpeg_box.show()
 
     @shared.thread_wrapper(daemon=True)
-    def save(self, file: pathlib.Path | shared.URL_with_filename, origin, tensor, save_func, item, finishCallback):
+    def save(
+        self, file: pathlib.Path | shared.URL_with_filename, origin, tensor, tags, save_func, item, finishCallback
+    ):
         global main_window
         self.saving += 1
         finishCallback(shared.FileStatus.Writing, item)
@@ -1162,62 +1165,84 @@ class SaveOptions(QGroupBox):
                 main_window.mixer.setEnabled(False)
                 self.retry_button.setEnabled(False)
                 for stem, stem_data in main_window.mixer.mix(origin, tensor):
-                    if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
-                        logging.warning("NaN or inf found in stem %s" % stem)
-                    match self.encoder_group.checkedId():
-                        case 0:
-                            file_ext = self.file_format.currentText()
-                        case 1:
-                            file_ext = self.file_extension.text().format(
-                                input=file.stem, inputext=file.suffix[1:], inputpath=str(file.parent)
-                            )
-                        case _:
-                            file_ext = "wav"
-                    parents = [file.name]
-                    parent = file
-                    while parent.parent != parent and len(parents) < 16:
-                        parent = parent.parent
-                        parents.append(parent.name)
-                    if len(parents) < 16:
-                        parents += [""] * (16 - len(parents))
-                    file_path_str = self.loc_input.currentText().format(
-                        *parents,
-                        track=file.stem,
-                        trackext=file.name,
-                        stem=stem,
-                        ext=file_ext,
-                        model=main_window.model_selector.select_combobox.currentText(),
-                        host=file["host"] if isinstance(file, shared.URL_with_filename) else "localfile",
-                    )
-                    match self.location_group.checkedId():
-                        case 0:
-                            file_path = file.parent / file_path_str
-                        case 1:
-                            file_path = pathlib.Path(file_path_str)
-                    match self.clip_mode.currentText():
-                        case "rescale":
-                            if (peak := stem_data.abs().max()) > 0.999:
-                                data = stem_data / peak * 0.999
-                            else:
+                    try:
+                        if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
+                            logging.warning("NaN or inf found in stem %s" % stem)
+                        match self.encoder_group.checkedId():
+                            case 0:
+                                file_ext = self.file_format.currentText()
+                            case 1:
+                                tags_avoid_conflict = tags.copy()
+                                for i in ["input", "inputext", "inputpath"]:
+                                    if i in tags_avoid_conflict:
+                                        tags_avoid_conflict.pop(i)
+                                file_ext = self.file_extension.text().format(
+                                    input=file.stem,
+                                    inputext=file.suffix[1:],
+                                    inputpath=str(file.parent),
+                                    **tags_avoid_conflict,
+                                )
+                            case _:
+                                file_ext = "wav"
+                        parents = [file.name]
+                        parent = file
+                        while parent.parent != parent and len(parents) < 16:
+                            parent = parent.parent
+                            parents.append(parent.name)
+                        if len(parents) < 16:
+                            parents += [""] * (16 - len(parents))
+                        tags_avoid_conflict = tags.copy()
+                        for i in ["track", "trackext", "stem", "ext", "model", "host"]:
+                            if i in tags_avoid_conflict:
+                                tags_avoid_conflict[f"{i}_"] = tags_avoid_conflict.pop(i)
+                        file_path_str = self.loc_input.currentText().format(
+                            *parents,
+                            track=file.stem,
+                            trackext=file.name,
+                            stem=stem,
+                            ext=file_ext,
+                            model=main_window.model_selector.select_combobox.currentText(),
+                            host=file["host"] if isinstance(file, shared.URL_with_filename) else "localfile",
+                            **tags_avoid_conflict,
+                        )
+                        match self.location_group.checkedId():
+                            case 0:
+                                file_path = file.parent / file_path_str
+                            case 1:
+                                file_path = pathlib.Path(file_path_str)
+                        match self.clip_mode.currentText():
+                            case "rescale":
+                                if (peak := stem_data.abs().max()) > 0.999:
+                                    data = stem_data / peak * 0.999
+                                else:
+                                    data = stem_data
+                            case "clamp":
+                                data = stem_data.clamp(-0.999, 0.999)
+                            case "tanh":
+                                data = stem_data.tanh()
+                            case "none":
                                 data = stem_data
-                        case "clamp":
-                            data = stem_data.clamp(-0.999, 0.999)
-                        case "tanh":
-                            data = stem_data.tanh()
-                        case "none":
-                            data = stem_data
+                    except Exception:
+                        logging.error("Failed to prepare data for saving:\n%s" % traceback.format_exc())
+                        ret = traceback.format_exc()
+                        break
                     try:
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         match self.encoder_group.checkedId():
                             case 0:
                                 ret = save_func(file_path, data, self.sample_fmt.currentData(), encoder="sndfile")
                             case 1:
+                                tags_avoid_conflict = tags.copy()
+                                for i in ["input", "inputext", "inputpath", "output"]:
+                                    if i in tags_avoid_conflict:
+                                        tags_avoid_conflict.pop(i)
                                 command = [
                                     i.format(
                                         input=file.stem,
                                         inputext=file.suffix[1:],
                                         inputpath=str(file.parent),
                                         output=str(file_path),
+                                        **tags_avoid_conflict,
                                     )
                                     for i in shared.try_parse_cmd(self.command.text())
                                 ]
@@ -1568,7 +1593,8 @@ class FileQueue(QWidget):
             "Add URLs",
             "Enter URLs to add to the queue, one per line\n"
             "You can specify the filename by separating file name and URL with a single space\n"
-            "Example: filename https://example.com/file.mp3",
+            "Example: filename%20containing%20space https://example.com/file.mp3\n"
+            "Spaces in both filename and URL should be URL-encoded (%20)",
             default_content,
         )
         if not ok:
@@ -1578,7 +1604,7 @@ class FileQueue(QWidget):
                 continue
             if " " in line:
                 name, url = line.rsplit(" ", 1)
-                name = re.sub(r'[/\\:?*"<>|\u0000-\u0019]', "", name.strip())
+                name = re.sub(r'[/\\:?*"<>|\u0000-\u0019]', "", urllib.parse.unquote(name.strip()))
                 url = shared.URL_with_filename(url, name=name, protocols=separator.audio.ffmpeg_protocols)
             else:
                 url = shared.URL_with_filename(line, protocols=separator.audio.ffmpeg_protocols)
