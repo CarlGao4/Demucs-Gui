@@ -968,7 +968,7 @@ class SaveOptions(QGroupBox):
         self.clip_mode_label.setText("Clip mode:")
 
         self.clip_mode = QComboBox()
-        self.clip_mode.addItems(["rescale", "clamp", "none"])
+        self.clip_mode.addItems(["rescale", "clamp", "tanh", "none"])
         self.clip_mode.setCurrentText(shared.GetHistory("clip_mode", default="rescale"))
         self.clip_mode.currentTextChanged.connect(lambda x: shared.SetHistory("clip_mode", value=x))
 
@@ -1202,6 +1202,8 @@ class SaveOptions(QGroupBox):
                                 data = stem_data
                         case "clamp":
                             data = stem_data.clamp(-0.999, 0.999)
+                        case "tanh":
+                            data = stem_data.tanh()
                         case "none":
                             data = stem_data
                     try:
