@@ -1164,6 +1164,7 @@ class SaveOptions(QGroupBox):
             while True:
                 main_window.mixer.setEnabled(False)
                 self.retry_button.setEnabled(False)
+                ret = None
                 for stem, stem_data in main_window.mixer.mix(origin, tensor):
                     try:
                         if separator.np.isnan(stem_data).any() or separator.np.isinf(stem_data).any():
