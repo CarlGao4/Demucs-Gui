@@ -75,7 +75,7 @@ def checkFFMpeg():
         global ffmpeg_available, format_filter, ffmpeg_protocols, ffmpeg_soxr_enabled
         p = shared.Popen(["ffmpeg", "-version"])
         out, _ = p.communicate()
-        out = out.decode()
+        out = out.decode(errors="replace")
         logging.info("ffmpeg -version output:\n" + out)
         if "libsoxr" in out:
             ffmpeg_soxr_enabled = True
@@ -83,12 +83,12 @@ def checkFFMpeg():
         ffmpeg_version = out.strip().splitlines()[0].strip()
         p = shared.Popen(["ffprobe", "-version"])
         out, _ = p.communicate()
-        out = out.decode()
+        out = out.decode(errors="replace")
         logging.info("Using ffmpeg from %s" % shutil.which("ffmpeg"))
         logging.info("ffprobe -version output:\n" + out)
         p = shared.Popen(["ffmpeg", "-protocols"])
         out, _ = p.communicate()
-        out = out.decode().splitlines()
+        out = out.decode(errors="replace").splitlines()
         while not out[0].startswith("Input:"):
             out = out[1:]
         for line in out[1:]:
@@ -97,7 +97,7 @@ def checkFFMpeg():
             ffmpeg_protocols.add(line.strip())
         p = shared.Popen(["ffprobe", "-protocols"])
         out, _ = p.communicate()
-        out = out.decode().splitlines()
+        out = out.decode(errors="replace").splitlines()
         while not out[0].startswith("Input:"):
             out = out[1:]
         ffprobe_protocols = set()
@@ -164,7 +164,7 @@ def read_audio_soundfile(file, target_sr=None, update_status: tp.Callable[[str],
             ["ffprobe", "-v", "level+warning", "-of", "json=c=1", "-show_streams", "-show_format", str(file)]
         )
         logging.debug("ffprobe command: %s" % shlex.join(p.args))
-        metadata_str = p.communicate()[0].decode()
+        metadata_str = p.communicate()[0].decode(errors="replace")
         if p.returncode != 0:
             logging.error("FFprobe failed with code %d, skipping tags" % p.returncode)
             return audio, tags
@@ -198,7 +198,7 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
         update_status(f"Reading file metadata: {file.name if hasattr(file, 'name') else file}")
     p = shared.Popen(["ffprobe", "-v", "level+warning", "-of", "json=c=1", "-show_streams", "-show_format", str(file)])
     logging.debug("ffprobe command: %s" % shlex.join(p.args))
-    metadata_str = p.communicate()[0].decode()
+    metadata_str = p.communicate()[0].decode(errors="replace")
     assert p.returncode == 0, "FFprobe failed with code %d" % p.returncode
     logging.info("ffprobe output:\n" + metadata_str)
     tags = audio_tags_default.copy()
@@ -234,7 +234,7 @@ def read_audio_ffmpeg(file, target_sr=None, update_status: tp.Callable[[str], No
     wav_buffer = io.BytesIO(ffmpeg_output)
     del ffmpeg_output
     if ffmpeg_log:
-        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode())
+        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode(errors="replace"))
     assert p.returncode == 0, "FFmpeg failed with code %d" % p.returncode
     wav_buffer.seek(0)
     audio, sr = soundfile.read(wav_buffer, dtype="float32", always_2d=True)
@@ -273,7 +273,7 @@ def save_audio_ffmpeg(command, audio, sr, update_status: tp.Callable[[str], None
         return False
     del wav, ffmpeg_output
     if ffmpeg_log:
-        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode())
+        logging.warning("ffmpeg output:\n" + ffmpeg_log.decode(errors="replace"))
     if p.returncode != 0:
         logging.error(f"FFmpeg failed with code {p.returncode}")
         return False

@@ -304,16 +304,20 @@ try:
         shared.Popen(
             [
                 "pwsh",
+                "-NoProfile",
+                "-NonInteractive",
+                "-NoLogo",
                 "-ExecutionPolicy",
                 "RemoteSigned",
                 "-Command",
+                "[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                 "try { $gpu = Get-WmiObject -Class Win32_VideoController } "
                 "catch { $gpu = Get-CimInstance -ClassName Win32_VideoController }; "
                 "foreach ($i in $gpu) { $i.Name; $i.PNPDeviceID; $i.DriverVersion }",
             ]
         )
         .communicate()[0]
-        .decode()
+        .decode(errors="replace")
         .splitlines()
     )
 except FileNotFoundError:
@@ -321,16 +325,19 @@ except FileNotFoundError:
         shared.Popen(
             [
                 "powershell",
+                "-NoProfile",
+                "-NoLogo",
                 "-ExecutionPolicy",
                 "RemoteSigned",
                 "-Command",
+                "[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                 "try { $gpu = Get-WmiObject -Class Win32_VideoController } "
                 "catch { $gpu = Get-CimInstance -ClassName Win32_VideoController }; "
                 "foreach ($i in $gpu) { $i.Name; $i.PNPDeviceID; $i.DriverVersion }",
             ]
         )
         .communicate()[0]
-        .decode()
+        .decode(errors="replace")
         .splitlines()
     )
 if len(out_lines) % 3 != 0:
