@@ -51,75 +51,79 @@ class ModelSourceNameUnsupportedError(Exception):
 
 
 @shared.thread_wrapper(daemon=True)
-def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float], None]):
-    global torch, demucs, audio, has_Intel, Intel_JIT_only, np
-    import torch
-    import numpy as np
+def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float, str], None]):
+    try:
+        global torch, demucs, audio, has_Intel, Intel_JIT_only, np
+        import torch
+        import numpy as np
 
-    for i in range(5):
-        try:
-            global ipex
-            ipex = False
-            import intel_extension_for_pytorch as ipex  # type: ignore
+        for i in range(5):
+            try:
+                global ipex
+                ipex = False
+                import intel_extension_for_pytorch as ipex  # type: ignore
 
-            logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
-        except ModuleNotFoundError:
-            logging.info("Intel Extension for PyTorch is not installed")
-            break
-        except Exception:
-            logging.error(
-                "Failed to load Intel Extension for PyTorch for the %d time:\n" % (i + 1) + traceback.format_exc()
-            )
-        else:
-            if torch.xpu.is_available():
-                has_Intel = True
-                if sys.platform == "win32":
-                    dll_size = os.path.getsize(ipex.dlls[0])
-                    logging.info("IPEX extension dll path: %s" % ipex.dlls[0])
-                    logging.info("IPEX extension dll size: %d" % dll_size)
-                    if dll_size < 1073741824:
-                        logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
-                        Intel_JIT_only = True
+                logging.info("Intel Extension for PyTorch version: " + ipex.__version__)
+            except ModuleNotFoundError:
+                logging.info("Intel Extension for PyTorch is not installed")
                 break
-    import demucs.api
-    import demucs.apply
-    import audio
+            except Exception:
+                logging.error(
+                    "Failed to load Intel Extension for PyTorch for the %d time:\n" % (i + 1) + traceback.format_exc()
+                )
+            else:
+                if torch.xpu.is_available():
+                    has_Intel = True
+                    if sys.platform == "win32":
+                        dll_size = os.path.getsize(ipex.dlls[0])
+                        logging.info("IPEX extension dll path: %s" % ipex.dlls[0])
+                        logging.info("IPEX extension dll size: %d" % dll_size)
+                        if dll_size < 1073741824:
+                            logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
+                            Intel_JIT_only = True
+                    break
+        import demucs.api
+        import demucs.apply
+        import audio
 
-    update_status("Successfully loaded modules")
-    logging.info("Demucs version: " + demucs.__version__)
-    logging.info("PyTorch version: " + torch.__version__)
-    if sys.platform == "darwin":
-        if torch.backends.mps.is_built() and torch.backends.mps.is_available():  # type: ignore
-            update_status("MPS backend is available")
+        update_status("Successfully loaded modules")
+        logging.info("Demucs version: " + demucs.__version__)
+        logging.info("PyTorch version: " + torch.__version__)
+        if sys.platform == "darwin":
+            if torch.backends.mps.is_built() and torch.backends.mps.is_available():  # type: ignore
+                update_status("MPS backend is available")
+            else:
+                update_status("MPS backend is not available")
         else:
-            update_status("MPS backend is not available")
-    else:
-        backends = []
-        if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
-            backends.append("CUDA")
-            logging.info(
-                "CUDA Info: "
-                + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
-            )
-            logging.info("CUDA Arch list: " + str(torch.cuda.get_arch_list()))
-        if ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
-            backends.append("Intel MKL")
-            logging.info(
-                "Intel MKL Info: "
-                + "    \n".join(str(torch.xpu.get_device_properties(i)) for i in range(torch.xpu.device_count()))
-            )
-        if backends:
-            update_status(", ".join(backends) + " backend is available")
+            backends = []
+            if torch.backends.cuda.is_built() and torch.cuda.is_available():  # type: ignore
+                backends.append("CUDA")
+                logging.info(
+                    "CUDA Info: "
+                    + "    \n".join(str(torch.cuda.get_device_properties(i)) for i in range(torch.cuda.device_count()))
+                )
+                logging.info("CUDA Arch list: " + str(torch.cuda.get_arch_list()))
+            if ipex is not None and hasattr(torch, "xpu") and torch.xpu.is_available():
+                backends.append("Intel MKL")
+                logging.info(
+                    "Intel MKL Info: "
+                    + "    \n".join(str(torch.xpu.get_device_properties(i)) for i in range(torch.xpu.device_count()))
+                )
+            if backends:
+                update_status(", ".join(backends) + " backend is available")
+            else:
+                update_status("No accelerator backend is available")
+        time.sleep(1)
+        ffmpeg_version = audio.checkFFMpeg()
+        if not ffmpeg_version:
+            update_status("FFMpeg is not available")
         else:
-            update_status("No accelerator backend is available")
-    time.sleep(1)
-    ffmpeg_version = audio.checkFFMpeg()
-    if not ffmpeg_version:
-        update_status("FFMpeg is not available")
-    else:
-        update_status("FFMpeg is available:\n" + ffmpeg_version)
-    time.sleep(1)
-    finish(2)
+            update_status("FFMpeg is available:\n" + ffmpeg_version)
+        time.sleep(1)
+        finish(2, "")
+    except Exception:
+        logging.error("Failed to start separator:\n" + traceback.format_exc())
+        finish(-1, traceback.format_exc())
 
 
 def getAvailableDevices():

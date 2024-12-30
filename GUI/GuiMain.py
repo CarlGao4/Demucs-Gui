@@ -141,7 +141,7 @@ file_queue_lock = threading.Lock()
 
 
 class StartingWindow(QMainWindow):
-    finish_sgn = Signal(float)
+    finish_sgn = Signal(float, str)
 
     def __init__(self):
         super().__init__()
@@ -199,7 +199,15 @@ class StartingWindow(QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         event.ignore()
 
-    def finish(self, paused_time=0):
+    def finish(self, paused_time=0, error=""):
+        if paused_time < 0:
+            msgbox = QMessageBox()
+            msgbox.setIcon(QMessageBox.Icon.Critical)
+            msgbox.setWindowTitle("Demucs GUI failed to start")
+            msgbox.setText(error)
+            msgbox.exec()
+            self.close()
+            sys.exit(1)
         self.end_time = time.perf_counter()
         global main_window
         main_window = MainWindow()
