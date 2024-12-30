@@ -70,8 +70,9 @@ import warnings
 warnings.filterwarnings("ignore", category=NotImplementedWarning)
 
 
-# Modified so that text can be wrapped everywhere
 class TextWrappedQLabel(QLabel):
+    """A QLabel that wraps text everywhere, not just at word boundaries."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -108,6 +109,8 @@ class TextWrappedQLabel(QLabel):
 
 
 class ExpandingQPlainTextEdit(QPlainTextEdit):
+    """A QPlainTextEdit that expands to fit its contents."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -232,6 +235,8 @@ class DelegateCombiner(QStyledItemDelegate):
 
 
 class ProgressDelegate(QStyledItemDelegate):
+    """A delegate that displays a progress bar in a QTableWidgetItem."""
+
     ProgressRole = Qt.ItemDataRole.UserRole + 0x1000
     TextRole = Qt.ItemDataRole.UserRole + 0x1001
 
@@ -289,6 +294,8 @@ class PercentSpinBoxDelegate(QStyledItemDelegate):
 
 
 class FileNameDelegate(QStyledItemDelegate):
+    """A delegate to edit file names."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -313,6 +320,8 @@ class FileNameDelegate(QStyledItemDelegate):
 
 
 class DoNothingDelegate(QStyledItemDelegate):
+    """A delegate that does nothing."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -329,8 +338,9 @@ class DoNothingDelegate(QStyledItemDelegate):
         pass
 
 
-# A simpler QAction that can be created with a callback
 class Action(QAction):
+    """A simple QAction that can be created with a callback."""
+
     def __init__(self, text, parent=None, callback=None):
         super().__init__(text, parent)
         self.triggered.connect(callback)

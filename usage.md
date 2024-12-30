@@ -67,6 +67,7 @@ On default, Demucs GUI has following outputs:
 1. "Single stems": Do not mix at all, save the outputs of each stem separately. This is enabled by default.
 2. "Minus stems": Extract the specific stem from original audio (Or, original audio minus the specific stem).
 3. "No stems": Mix all the stems except the specific stem together. ***Not recommended** personally as "other" stem is treated same as stems like "vocals", which means adding up all the stems does not equal to the original audio. I'd suggest use the minus stems above instead.*
+4. "All left": Sounds does not exist in all stems (Or, original audio minus all stems). *\*New in 1.3*
 
 These outputs are created for each stem.
 

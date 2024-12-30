@@ -270,6 +270,8 @@ class Separator:
             )
         if "origin" in self.separator.model.sources:
             raise ModelSourceNameUnsupportedError("Source name 'origin' is reserved in model %s" % model)
+        if "all_left" in self.separator.model.sources:
+            raise ModelSourceNameUnsupportedError("Source name 'all_left' is reserved in model %s" % model)
         self.model = model
         self.repo = repo
         if not isinstance(self.separator.model, demucs.apply.BagOfModels):

@@ -1,4 +1,4 @@
-__version__ = "1.3b1"
+__version__ = "1.3"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Demucs-GUI developers
@@ -388,6 +388,8 @@ class MainWindow(QMainWindow):
                 == self.m.StandardButton.Yes
             )
         ):
+            if shared.debug:
+                self.code_input_window.close()
             return super().closeEvent(event)
         else:
             event.ignore()
