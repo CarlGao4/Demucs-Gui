@@ -1808,14 +1808,14 @@ class Mixer(QWidget):
 
         self.delegate = DelegateCallback(self)
         self.delegate.addDelegate(
-            FileNameDelegate(), lambda x: x.column() == 1 and x.row() >= len(main_window.separator.sources) * 3
+            FileNameDelegate(), lambda x: x.column() == 1 and x.row() > len(main_window.separator.sources) * 3
         )
         self.delegate.addDelegate(
             PercentSpinBoxDelegate(minimum=-500, maximum=500, step=1),
-            lambda x: x.column() > 1 and x.row() >= len(main_window.separator.sources) * 3,
+            lambda x: x.column() > 1 and x.row() > len(main_window.separator.sources) * 3,
         )
         self.delegate.addDelegate(
-            DoNothingDelegate(), lambda x: x.column() >= 1 and x.row() < len(main_window.separator.sources) * 3
+            DoNothingDelegate(), lambda x: x.column() >= 1 and x.row() <= len(main_window.separator.sources) * 3
         )
         self.outputs_table.setItemDelegate(self.delegate)
 
@@ -1872,11 +1872,11 @@ class Mixer(QWidget):
             self.removeSelected()
 
     def removeSelected(self):
-        if max(i.row() for i in self.outputs_table.selectedIndexes()) < len(main_window.separator.sources) * 3:
+        if max(i.row() for i in self.outputs_table.selectedIndexes()) <= len(main_window.separator.sources) * 3:
             main_window.showError.emit("Cannot remove default stems", "Cannot remove default stems")
         indexes = sorted(list(set(i.row() for i in self.outputs_table.selectedIndexes())), reverse=True)
         for i in indexes:
-            if i < len(main_window.separator.sources) * 3:
+            if i <= len(main_window.separator.sources) * 3:
                 break
             self.outputs_table.removeRow(i)
 
@@ -1911,6 +1911,13 @@ class Mixer(QWidget):
                 False,
             )
 
+        # All left
+        self.outputs_table.addRow(
+            ["all_left"]
+            + ["100%\u3000" if j == 0 else "-100%\u3000" for j in range(len(main_window.separator.sources) + 1)],
+            False,
+        )
+
     def addStem(self, *, stem_name="stem", enabled=True):
         self.outputs_table.addRow([stem_name] + ["0%\u3000"] * (len(main_window.separator.sources) + 1), enabled)
 
@@ -1924,9 +1931,9 @@ class Mixer(QWidget):
     def getCurrentPreset(self):
         preset = [{}, []]
         # For default stems, we only save whether it is enabled
-        for i in range(len(main_window.separator.sources) * 3):
+        for i in range(len(main_window.separator.sources) * 3 + 1):
             preset[0][self.outputs_table.item(i, 0).text()] = self.outputs_table.getCheckState(i)
-        for i in range(len(main_window.separator.sources) * 3, self.outputs_table.rowCount()):
+        for i in range(len(main_window.separator.sources) * 3 + 1, self.outputs_table.rowCount()):
             # We can't assume that all models have sorted sources, so use dict to store the values
             # Item format: ("stem name", {"source": "value"}, bool("enabled"))
             preset[1].append(
@@ -1955,7 +1962,15 @@ class Mixer(QWidget):
             return
         logging.info("Saving preset name: %s" % name)
         if name in shared.GetHistory("presets", self.preset_stem_key, default={}, autoset=False):
-            if not main_window.m.question("Preset name already exists", "Preset name already exists, overwrite?"):
+            if (
+                not main_window.m.question(
+                    "Preset name already exists",
+                    "Preset name already exists, overwrite?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                == QMessageBox.StandardButton.Yes
+            ):
                 return
             logging.info("Preset name already exists, overwriting")
         preset = self.getCurrentPreset()
@@ -2021,8 +2036,8 @@ class Mixer(QWidget):
             self.outputs_table.removeRow(0)
         # Add default stems and restore their enabled state
         self.addDefaultStems()
-        for i in range(len(main_window.separator.sources) * 3):
-            self.outputs_table.setCheckState(i, preset[0][self.outputs_table.item(i, 0).text()])
+        for i in range(len(main_window.separator.sources) * 3 + 1):
+            self.outputs_table.setCheckState(i, preset[0].get(self.outputs_table.item(i, 0).text(), False))
         # Add custom stems and restore their values and enabled state
         for stem, sources, enabled in preset[1]:
             # Calculate weights first
@@ -2054,7 +2069,7 @@ class Mixer(QWidget):
     def sliderValueChanged(self, value):
         if self.slider_value_changed_by_user:
             for i in self.outputs_table.selectedItems():
-                if i.column() != 1 and i.row() >= len(main_window.separator.sources) * 3:
+                if i.column() != 1 and i.row() > len(main_window.separator.sources) * 3:
                     i.setData(Qt.ItemDataRole.EditRole, str(value) + "%\u3000")
         else:
             self.slider_value_changed_by_user = True
