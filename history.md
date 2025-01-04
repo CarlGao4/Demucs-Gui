@@ -1,5 +1,15 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.3
+Release date: Jan. 4, 2025
+
+#### Updates
+1. Added new default mixer output: `all_left`. This will output sounds do not exist in all stems.
+
+#### Fixes
+1. Will replace unsupported characters when decoding UTF-8 encoded strings to solve UnicodeDecodeError
+2. Errors encountered when starting the application could be shown using a message box and the splash screen could be closed
+
 ### *1.3b1*
 Release date: Nov. 3, 2024
 
