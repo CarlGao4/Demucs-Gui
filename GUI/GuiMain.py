@@ -449,13 +449,15 @@ class MainWindow(QMainWindow):
                 os.system(shlex.join(["open", str(shared.logfile.resolve())]))
             case _:
                 try:
-                    os.system(shlex.join(["xdg-open", str(shared.logfile.resolve()), "&"]))
+                    p = shared.Popen(["xdg-open", str(shared.logfile.resolve())])
+                    assert p.wait(1) == 0
                 except Exception:
                     if (
                         self.m.question(
                             self,
                             "Open log failed",
-                            "Failed to open log file. Do you want to copy the path?",
+                            "Failed to open log file. Do you want to copy the path?\n"
+                            "Log file path: %s" % shared.logfile,
                             self.m.StandardButton.Yes,
                             self.m.StandardButton.No,
                         )
