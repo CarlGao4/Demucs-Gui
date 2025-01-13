@@ -1,4 +1,4 @@
-__version__ = "1.3"
+__version__ = "1.3.0.1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2024  Demucs-GUI developers
@@ -551,7 +551,7 @@ class MainWindow(QMainWindow):
 
     def ask_AOT(self, *, open_from_menu=True):
         intel_gpus = []
-        ipex_version = separator.ipex.__version__.split("+", 1)[0] if separator.ipex is not None else None
+        ipex_version = separator.ipex.__version__ if separator.ipex is not None else None
         if not find_device_win.ipex_version_available(ipex_version):
             if open_from_menu:
                 self.m.warning(

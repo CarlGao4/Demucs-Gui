@@ -33,7 +33,7 @@ For Windows: At least Windows 8
 
 For Mac: At least macOS 10.15
 
-For Linux: Any system that can install and run python 3.11 (Because I'll pack the binaries using python 3.11)
+For Linux: Any system that can install and run python 3.11 (Because I'll pack the binaries using python 3.11). Requires at least glibc 2.27. If you are using xcb, you may need to install `libxcb-cursor0` (package name may vary on different distributions).
 
 #### Hardware
 Memory: About at least 8GB of total memory (physical and swap) would be required. The longer the track you want to separate, the more memory will be required.
@@ -44,7 +44,7 @@ GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5), Intel A
 At least Python 3.10 is required. Other requirements please refer to [Installing binaries](#installing-binaries).
 
 ## Downloads
-Binaries for download are available [here](https://github.com/CarlGao4/Demucs-Gui/releases).
+Binaries for download are available on [GitHub Releases](https://github.com/CarlGao4/Demucs-Gui/releases) and [FossHub](https://www.fosshub.com/Demucs-GUI.html). Some files are too large to be uploaded to GitHub, so please refer to FossHub if you cannot find the file you need on GitHub.
 
 ## Update History
 

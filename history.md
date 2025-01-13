@@ -1,5 +1,14 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.3.0.1
+Release date: Jan. 13, 2025
+
+#### Updates
+1. Added support for Intel Extension for PyTorch `2.1.40+xpu` built with oneAPI 2025.0.1
+
+#### Fixes
+1. Fixed an issue that on Linux log file can't be opened using the system file manager
+
 ### 1.3
 Release date: Jan. 4, 2025
 
