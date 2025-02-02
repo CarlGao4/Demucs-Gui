@@ -101,7 +101,7 @@ This will shift the start of segments by a random amount within 0 and 0.5s sever
 
 Choose which device to use. If you install ROCm version, your AMD GPU will also be listed as `CUDA`. If you are separating `HDemucs` model on macOS, I'd suggest you to use `CPU` instead of `MPS` to speed up up to 10x (though I don't know why).
 
-### Save opetions
+### Save options
 
 #### Save file location
 
@@ -120,6 +120,15 @@ You can use variables to rename your output file. Available variables are:
 For example, when saving stem "vocals" of "audio.mp3" using model htdemucs, with output format flac, the default location `separated/{model}/{track}/{stem}.{ext}` would be "separated/htdemucs/audio/vocals.flac", with the folder "separated" created under the same folder of the original audio file.
 
 Demucs GUI will overwrite existing files without warning. Remember to include `{stem}` in your output file name.
+
+#### Clip mode
+
+Clip mode determines how to clip the output audio.
+
+- `None`: Do not clip the output audio. The output audio may contain values greater than 1 or less than -1. If you are using float32 output format, the output audio will contains raw data of the model output, which is suggested if you want to further process the output audio, though output audio size will be larger.
+- `rescale`: If no data is clipped, the output audio will be the same as the model output. If the output audio contains values greater than 1 or less than -1, the output audio will be clipped to -0.999 to 0.999. If the model output is too loud, this will cause data loss due to precision. This is the default clip mode.
+- `clamp`: Clip the output audio to -0.999 to 0.999. This will cause distortion if the output audio contains values outside this range.
+- `tanh`: Clip the output audio to -1 to 1 using tanh function. This will cause distortion. The louder the audio is, the more distortion it will cause. *\*New in 1.3b1*
 
 ### Reading with FFMpeg
 
