@@ -7,7 +7,7 @@ The project aims to let users without any coding experience separate tracks with
 
 ### Donate to me
 
-**Currently I'm training some new great models (like 10-stem model) for this project. However as a student I don't have enough money to rent powerful GPUs. With your help, I can train the new models up to 100x faster. I promise I will use the money only for training models and will release the models to the public for free. Currently I'm encountering model not learning issue, I'm still finding a solution.**
+**Currently I'm training some new great models (like 10-stem model) for this project. However as a student I don't have enough money to rent powerful GPUs. With your help, I can train the new models up to 100x faster. I promise I will use the money only for training models and will release the models to the public for free. Currently I'm encountering model not learning issue, I'm still finding a solution. Besides, recently I'm taking more classes so I have less time to develop this project, so I'm not sure when the models will be ready.**
 
 **If you like this project, please consider donating to me.**
 
