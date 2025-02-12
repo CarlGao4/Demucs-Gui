@@ -1,5 +1,11 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.3.1
+Release date: Feb. 12, 2025
+
+#### Fixes
+1. Fixed FFMpeg preset saving issue
+
 ### 1.3.0.1
 Release date: Jan. 13, 2025
 

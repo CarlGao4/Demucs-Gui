@@ -1,7 +1,7 @@
-__version__ = "1.3.0.1"
+__version__ = "1.3.1"
 
 LICENSE = f"""Demucs-GUI {__version__}
-Copyright (C) 2022-2024  Demucs-GUI developers
+Copyright (C) 2022-2025  Demucs-GUI developers
 See https://github.com/CarlGao4/Demucs-Gui for more information
 
 This program is free software: you can redistribute it and/or modify \
@@ -1035,6 +1035,7 @@ class SaveOptions(QGroupBox):
         self.preset_selector.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.loadPresets()
         self.preset_selector.setCurrentText(shared.GetHistory("ffmpeg_default_preset", default="MP3"))
+        self.ignore_preset_change = False
         self.preset_selector.currentIndexChanged.connect(self.switchFFmpegPreset)
 
         self.file_extension_label = QLabel()
@@ -1298,6 +1299,7 @@ class SaveOptions(QGroupBox):
             finishCallback(shared.FileStatus.Failed, item)
 
     def loadPresets(self):
+        self.ignore_preset_change = True
         self.preset_selector.clear()
         self.preset_selector.addItem(
             "MP3", {"command": "ffmpeg -y -v level+warning -i - -c:a libmp3lame -b:a 320k {output}", "ext": "mp3"}
@@ -1314,50 +1316,63 @@ class SaveOptions(QGroupBox):
             },
         )
         for name, preset in shared.GetHistory("ffmpeg_presets", default={}).items():
-            self.preset_selector.addItem(name, preset)
+            preset_dict = json.loads(preset)
+            if not isinstance(preset_dict, dict) or set(preset_dict.keys()) != {"name", "command", "ext"}:
+                logging.error("Invalid preset %s: %s" % (name, preset))
+                continue
+            self.preset_selector.addItem(preset_dict.pop("name"), preset_dict)
+        self.ignore_preset_change = False
+        self.preset_selector.currentIndexChanged.emit(0)
 
     def savePreset(self):
         name, ok = QInputDialog.getText(self, "Save preset", "Enter a name for the preset")
         if not ok:
             return
         if name.lower() in {"mp3", "aac", "copy video stream"}:
-            self.m.warning(self, "Invalid name", "Name cannot be 'MP3', 'AAC' or 'Copy video stream'.")
+            main_window.m.warning(self, "Invalid name", "Name cannot be 'MP3', 'AAC' or 'Copy video stream'.")
             return
-        if name in shared.GetHistory("ffmpeg_presets", default={}):
+        if name.lower() in shared.GetHistory("ffmpeg_presets", default={}):
             if (
-                self.m.question(
+                main_window.m.question(
                     self,
                     "Overwrite preset",
                     "Preset '%s' already exists. Overwrite?" % name,
-                    self.m.StandardButton.Yes,
-                    self.m.StandardButton.No,
+                    main_window.m.StandardButton.Yes,
+                    main_window.m.StandardButton.No,
                 )
-                == self.m.StandardButton.No
+                == main_window.m.StandardButton.No
             ):
                 return
         logging.info("Save preset %s:\ncommand: %s\next: %s" % (name, self.command.text(), self.file_extension.text()))
-        shared.AddHistory(
-            "ffmpeg_presets", name, value={"command": self.command.text(), "ext": self.file_extension.text()}
+        shared.SetHistory(
+            "ffmpeg_presets",
+            name.lower(),
+            value=json.dumps(
+                {"name": name, "command": self.command.text(), "ext": self.file_extension.text()}, separators=(",", ":")
+            ),
         )
+        self.loadPresets()
+        self.preset_selector.setCurrentText(name)
 
     def removePreset(self):
         name = self.preset_selector.currentText()
         if name.lower() in {"mp3", "aac", "copy video stream"}:
-            self.m.warning(self, "Invalid name", "Cannot remove built-in presets.")
+            main_window.m.warning(self, "Invalid name", "Cannot remove built-in presets.")
             return
         if (
-            self.m.question(
+            main_window.m.question(
                 self,
                 "Remove preset",
                 "Remove preset '%s'?" % name,
-                self.m.StandardButton.Yes,
-                self.m.StandardButton.No,
+                main_window.m.StandardButton.Yes,
+                main_window.m.StandardButton.No,
             )
-            == self.m.StandardButton.No
+            == main_window.m.StandardButton.No
         ):
             return
         logging.info("Remove preset %s" % name)
-        shared.RemoveHistory("ffmpeg_presets", name)
+        shared.ResetHistory("ffmpeg_presets", name.lower())
+        self.loadPresets()
 
     def setDefault(self):
         preset = self.preset_selector.currentText()
@@ -1381,6 +1396,8 @@ class SaveOptions(QGroupBox):
             self.parsed_command.setText("Parsed command:\nInvalid command")
 
     def switchFFmpegPreset(self, index=None):
+        if self.ignore_preset_change:
+            return
         if self.preset_selector.currentData() is None:
             self.preset_selector.setCurrentIndex(0)
         self.file_extension.setText(self.preset_selector.currentData()["ext"])
