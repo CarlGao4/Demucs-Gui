@@ -1,5 +1,5 @@
 # Demucs-GUI
-# Copyright (C) 2022-2024  Demucs-GUI developers
+# Copyright (C) 2022-2025  Demucs-GUI developers
 # See https://github.com/CarlGao4/Demucs-Gui for more information
 
 # This program is free software: you can redistribute it and/or modify
