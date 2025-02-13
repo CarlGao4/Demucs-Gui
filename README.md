@@ -20,10 +20,19 @@ The project aims to let users without any coding experience separate tracks with
 
 If the application cannot be launched due to the Mac's security protection feature, try the following:
 
+For macOS versions below 15.0:
+
 1. Right-click on the Demucs-GUI app icon and select "Open".
 2. Click "Open" again in the window that appears as follows.
+
 ![Open Anyway](./mac_open_anyway.png)
 
+For macOS versions 15.0 or greater:
+1. On your Mac, go to System Settings > Privacy & Security > Scroll to the Security section.
+2. If you see a message stating "'Demucs-GUI.app' was blocked to protect your Mac." - to the right of this message, click "Open Anyway".
+3. Enter your login password, then click OK. This will create an override in Gatekeeper, allowing Demucs-GUI to run.
+
+![demucs-gui-macos15-gatekeeper-block-2](./macos15_open_anyway.png)
 </details>
 
 ## System requirements
