@@ -1,4 +1,4 @@
-__version__ = "1.3.1"
+__version__ = "2.0a1"
 
 LICENSE = f"""Demucs-GUI {__version__}
 Copyright (C) 2022-2025  Demucs-GUI developers
@@ -249,6 +249,14 @@ class MainWindow(QMainWindow):
         self.showParamSettings.connect(self.showParamSettingsFunc)
         self.setStatusText.connect(self.setStatusTextFunc)
         self._execInMainThreadSignal.connect(self._exec_in_main_thread_executor)
+
+        separator.setUpdateStatusFunc(self.setStatusText.emit)
+
+        self.model_class = {}  # type: dict[str, tuple[separator.SeparatorModelBase, str]]
+        for i in separator.available_model_types:
+            model_class = i()
+            self.model_class[model_class.model_type] = (model_class, model_class.model_description)
+
         self.timer.singleShot(50, self.showModelSelector)
 
         self.menubar = QMenuBar()
@@ -361,9 +369,10 @@ class MainWindow(QMainWindow):
             self.tab_widget.indexOf(self.file_queue), self.file_queue.widget_title % self.file_queue.queue_length
         )
 
-    def loadModel(self, model, repo):
+    def loadModel(self, model_type, model, repo):
         try:
-            self.separator = separator.Separator(model, repo, self.setStatusText.emit)
+            self.separator = self.model_class[model_type][0]
+            self.separator.loadModel(model, repo)
         except separator.ModelSourceNameUnsupportedError as e:
             return e
         except Exception:
@@ -651,6 +660,22 @@ class ModelSelector(QWidget):
 
         self.advanced_settings = AdvancedModelSettings(self.refreshModels)
 
+        self.model_type_label = QLabel()
+        self.model_type_label.setText("Model type:")
+        self.model_type_label.setFixedWidth(80)
+
+        self.model_type_combobox = QComboBox()
+        self.model_type_combobox.addItems(main_window.model_class.keys())
+        self.model_type_combobox.setMinimumWidth(240)
+        self.model_type_combobox.currentIndexChanged.connect(self.changeModelType)
+
+        self.model_type_description = TextWrappedQLabel()
+        self.model_type_description.setWordWrap(True)
+        self.model_type_description.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.model_type_description.setMinimumWidth(300)
+        self.model_type_description.setMinimumHeight(0)
+        self.model_type_description.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
         self.select_label = QLabel()
         self.select_label.setText("Model:")
         self.select_label.setFixedWidth(80)
@@ -664,6 +689,7 @@ class ModelSelector(QWidget):
         self.model_info.setWordWrap(True)
         self.model_info.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.model_info.setMinimumWidth(300)
+        self.model_info.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
 
         self.refresh_button = QPushButton()
         self.refresh_button.setText("Refresh")
@@ -679,24 +705,35 @@ class ModelSelector(QWidget):
         self.load_button.clicked.connect(self.loadModel)
 
         self.widget_layout = QGridLayout()
-        self.widget_layout.addWidget(self.select_label, 0, 0)
-        self.widget_layout.addWidget(self.select_combobox, 0, 1)
-        self.widget_layout.addWidget(self.refresh_button, 0, 2)
-        self.widget_layout.addWidget(self.model_info, 2, 0, 1, 3)
+        self.widget_layout.addWidget(self.model_type_label, 0, 0)
+        self.widget_layout.addWidget(self.model_type_combobox, 0, 1, 1, 2)
+        self.widget_layout.addWidget(self.model_type_description, 1, 0, 1, 3)
+        self.widget_layout.addWidget(self.select_label, 2, 0)
+        self.widget_layout.addWidget(self.select_combobox, 2, 1)
+        self.widget_layout.addWidget(self.refresh_button, 2, 2)
+        self.widget_layout.addWidget(self.model_info, 3, 0, 1, 3)
 
         self.button_layout = QHBoxLayout()
         self.button_layout.addWidget(self.advanced_button)
         self.button_layout.addWidget(self.load_button)
-        self.widget_layout.addLayout(self.button_layout, 3, 0, 1, 3)
+        self.widget_layout.addLayout(self.button_layout, 4, 0, 1, 3)
 
         self.setLayout(self.widget_layout)
+        self.changeModelType()
+
+    def changeModelType(self, _=None):
+        self.model_type_description.setText(main_window.model_class[self.model_type_combobox.currentText()][1])
         self.refreshModels()
 
     def updateModelInfo(self, index):
+        if not self.select_combobox.currentText().strip():
+            self.model_info.setText("")
+            return
         self.model_info.setText(self.infos[index])
 
     def refreshModels(self):
-        self.models, self.infos, self.repos = separator.autoListModels()
+        model_type = self.model_type_combobox.currentText()
+        self.models, self.infos, self.repos = main_window.model_class[model_type][0].listModels()
         self.setEnabled(False)
         self.select_combobox.clear()
         self.select_combobox.addItems(self.models)
@@ -709,6 +746,7 @@ class ModelSelector(QWidget):
         main_window.exec_in_main(lambda: self.setEnabled(False))
         main_window.exec_in_main(lambda: self.advanced_settings.setEnabled(False))
 
+        model_type = self.model_type_combobox.currentText()
         model_name = self.models[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
         model_repo = self.repos[main_window.exec_in_main(lambda: self.select_combobox.currentIndex())]
         logging.info(
@@ -717,7 +755,7 @@ class ModelSelector(QWidget):
         main_window.setStatusText.emit("Loading model %s" % model_name)
 
         start_time = time.perf_counter()
-        success = main_window.loadModel(model_name, model_repo)
+        success = main_window.loadModel(model_type, model_name, model_repo)
         end_time = time.perf_counter()
 
         match success:
@@ -840,9 +878,9 @@ class SepParamSettings(QGroupBox):
         self.segment_label.setToolTip("Length of each segment")
 
         self.segment_spinbox = QDoubleSpinBox()
-        self.segment_spinbox.setRange(0.1, math.floor(float(main_window.separator.default_segment) * 10) / 10)
+        self.segment_spinbox.setRange(0.1, math.floor(float(main_window.separator.max_segment) * 10) / 10)
         self.segment_spinbox.setSingleStep(0.1)
-        self.segment_spinbox.setValue(self.segment_spinbox.maximum())
+        self.segment_spinbox.setValue(math.floor(float(main_window.separator.default_segment) * 10) / 10)
         self.segment_spinbox.setSuffix("s")
         self.segment_spinbox.setDecimals(1)
 

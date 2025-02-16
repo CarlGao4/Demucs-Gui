@@ -19,3 +19,7 @@ certifi
 diffq>=0.2.1
 more-itertools
 tinytag<2
+
+# New installation required since 2.0 as Apollo model has been added
+# urllib3, threadpoolctl, scipy, platformdirs, msgpack, llvmlite, lazy-loader, joblib, idna, decorator, charset-normalizer, audioread, absl-py, scikit-learn, requests, numba, ml-collections, pooch, huggingface-hub, librosa, Apollo
+git+https://github.com/CarlGao4/Apollo-setup-py.git
