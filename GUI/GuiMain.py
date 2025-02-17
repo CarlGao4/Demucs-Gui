@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
         self.menu_check_update = Action(
             "Check for update",
             self,
-            lambda: shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x, show=True))),
+            lambda: shared.checkUpdate(lambda *x: self.exec_in_main(lambda: self.validateUpdate(*x, show=True))),
         )
         self.menu_restart = Action("Restart", self, self.restart)
         self.menu_about_log = Action("Open log", self, self.open_log)
@@ -335,7 +335,7 @@ class MainWindow(QMainWindow):
         self._status_prefix = ""
         self._status_text = ""
 
-        shared.checkUpdate(lambda x: self.exec_in_main(lambda: self.validateUpdate(x)))
+        shared.checkUpdate(lambda *x: self.exec_in_main(lambda: self.validateUpdate(*x)))
 
     def showModelSelector(self):
         self.model_selector = ModelSelector()
@@ -500,7 +500,7 @@ class MainWindow(QMainWindow):
             self._execInMainThreadSuccess = False
         self._execInMainThreadResultEvent.set()
 
-    def validateUpdate(self, new_version, show=False):
+    def validateUpdate(self, new_version, description="", show=False):
         if new_version is None:
             if show:
                 self.m.warning(
@@ -512,15 +512,14 @@ class MainWindow(QMainWindow):
             if show:
                 self.m.information(self, "No update available", "You are using the latest version.")
             return
+        message = f"A new version ({new_version}) of Demucs GUI is available. "
+        if description:
+            message += f"\n\n{description}\n\n"
+        message += "Do you want to visit GitHub to download it?"
+        if version_new.is_prerelease:
+            message += "\nWarning: this is a pre-release version."
         if (
-            self.m.question(
-                self,
-                "Update available",
-                "A new version (%s) of Demucs GUI is available. Do you want to visit GitHub to download it?%s"
-                % (new_version, "\nWarning: this is a pre-release version." if version_new.is_prerelease else ""),
-                self.m.StandardButton.Yes,
-                self.m.StandardButton.No,
-            )
+            self.m.question(self, "Update available", message, self.m.StandardButton.Yes, self.m.StandardButton.No)
             == self.m.StandardButton.Yes
         ):
             webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/releases")
@@ -2359,6 +2358,7 @@ if __name__ == "__main__":
         else:
             log = open(str(shared.logfile / log_filename), mode="at", encoding="utf-8")
             sys.stderr = log
+            sys.stdout = log
         handler = logging.StreamHandler(log)
         try:
             assert sys.platform == "darwin" or sys.platform == "linux"
