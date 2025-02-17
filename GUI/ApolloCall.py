@@ -27,6 +27,9 @@ import julius
 import look2hear.models
 import tqdm
 import random
+import logging
+import inspect
+import yaml
 
 
 # Modified from api.py and apply.py in Demucs
@@ -505,10 +508,37 @@ class Enhancer:
             conf = th.load(self._repo / f"{self._name}.bin", map_location="cpu")
         elif (self._repo / f"{self._name}.ckpt").exists():
             conf = th.load(self._repo / f"{self._name}.ckpt", map_location="cpu")
+        # If the model config is provided along with the model, read additional information
+        if (self._repo / f"{self._name}.yml").exists():
+            logging.info(f"Found model config file! Reading config from {self._repo / f'{self._name}.yml'}")
+            with open(self._repo / f"{self._name}.yml", "rt", encoding="utf-8") as f:
+                model_init_config = yaml.safe_load(f)["model"]
+            logging.info(f"model init config: {model_init_config}")
+        elif (self._repo / f"{self._name}.yaml").exists():
+            logging.info(f"Found model config file! Reading config from {self._repo / f'{self._name}.yaml'}")
+            with open(self._repo / f"{self._name}.yaml", "rt", encoding="utf-8") as f:
+                model_init_config = yaml.safe_load(f)["model"]
+            logging.info(f"model init config: {model_init_config}")
+        else:
+            model_init_config = {}
         model_class = look2hear.models.get(conf["model_name"])
-        self._model = model_class(**conf["model_args"])
+        init_args = conf["model_args"]
+        logging.info(f"model init args: {init_args}")
+        # Uses args from the model when a same key is provided in both the model config and the model
+        model_init_config.update(init_args)
+        init_args = model_init_config
+        # We need to remove the parameters that are not in the model constructor
+        # Get all argument names that can be specified with keyword arguments
+        params = inspect.signature(model_class.__init__).parameters.copy()
+        # Remove 'self' (the first argument)
+        params.pop(next(iter(params)))
+        # If the constructor has variadic keyword arguments, we do not to filter unsupported arguments
+        if not any(p.kind == p.VAR_KEYWORD for p in params.values()):
+            availble_args = set(i for i, j in params.items() if j.kind in {j.POSITIONAL_OR_KEYWORD, j.KEYWORD_ONLY})
+            init_args = {k: v for k, v in init_args.items() if k in availble_args}
+        self._model = model_class(**init_args)
         self._model.load_state_dict(conf["state_dict"])
-        self._samplerate = conf["model_args"]["sr"]
+        self._samplerate = self._model._sample_rate
 
     def enhance_tensor(self, wav: th.Tensor, sr: Optional[int] = None) -> Tuple[th.Tensor, th.Tensor]:
         """
