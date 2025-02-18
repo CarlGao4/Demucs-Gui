@@ -5,6 +5,8 @@ This is a GUI for music separation project `demucs`.
 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/adefossez/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases.
 
+**Currently 1.x versions are about to out of support. 2.0 is coming soon with new AI models supported. Until now, [the lossy compression restoration algorithm JusperLee/Apollo](https://github.com/JusperLee/Apollo) has been integrated into the project. To use the latest features, please switch to [`v2-develop` branch](https://github.com/CarlGao4/Demucs-Gui/tree/v2-develop).**
+
 ### Donate to me
 
 **Currently I'm training some new great models (like 10-stem model) for this project. However as a student I don't have enough money to rent powerful GPUs. With your help, I can train the new models up to 100x faster. I promise I will use the money only for training models and will release the models to the public for free. Currently I'm encountering model not learning issue, I'm still finding a solution. Besides, recently I'm taking more classes so I have less time to develop this project, so I'm not sure when the models will be ready.**
