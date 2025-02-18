@@ -5,6 +5,14 @@ This is a GUI for music separation project `demucs`.
 
 The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/adefossez/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases.
 
+**DEVELOP BRANCH: This branch contains the latest code and currently no binaries are available. If you want to run the code yourself, please refer to [Usage](#usage).**
+
+**However, I'll randomly pack the binaries for testing purposes. Not all platforms are guaranteed to be packed.**
+
+##### Download links
+
+[Demucs-GUI_2.0.dev0_cuda_mkl.7z](https://demucs-gui.carlgao4.workers.dev/files/Demucs-GUI_2.0.dev0_cuda_mkl.7z)
+
 ### Donate to me
 
 **Currently I'm training some new great models (like 10-stem model) for this project. However as a student I don't have enough money to rent powerful GPUs. With your help, I can train the new models up to 100x faster. I promise I will use the money only for training models and will release the models to the public for free. Currently I'm encountering model not learning issue, I'm still finding a solution. Besides, recently I'm taking more classes so I have less time to develop this project, so I'm not sure when the models will be ready.**
