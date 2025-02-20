@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import hashlib
+import importlib
 import json
 import logging
 import os
@@ -50,10 +51,36 @@ class ModelSourceNameUnsupportedError(Exception):
     pass
 
 
+def try_import(module):
+    """Try to import a module and make it available in the global scope."""
+    if "." in module and module[0] != ".":
+        try_import(module.rsplit(".", 1)[0])
+        importlib.import_module(module)
+        return
+    if module[0] == ".":
+        try:
+            globals()[module[1:]] = importlib.import_module(module)
+        except ImportError:
+            logging.error("Failed to import %s:\n%s" % (module, traceback.format_exc()))
+    else:
+        try:
+            globals()[module] = importlib.import_module(module)
+        except ImportError:
+            logging.error("Failed to import %s:\n%s" % (module, traceback.format_exc()))
+
+
+def global_module_for_linter():
+    """A useless function to make linter recognize global modules."""
+    global demucs, ApolloCall
+    import demucs.api
+    import demucs.apply
+    import ApolloCall
+
+
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float, str], None]):
     try:
-        global torch, demucs, audio, has_Intel, Intel_JIT_only, np, ApolloCall, gain
+        global torch, audio, has_Intel, Intel_JIT_only, np, gain
         import torch
         import numpy as np
 
@@ -82,9 +109,10 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float,
                             logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
                             Intel_JIT_only = True
                     break
-        import demucs.api
-        import demucs.apply
-        import ApolloCall
+        try_import("demucs.api")
+        try_import("demucs.apply")
+        try_import("ApolloCall")
+
         import audio
 
         gain = audio.gain
@@ -195,11 +223,15 @@ def setUpdateStatusFunc(func):
 class SeparatorModelBase:
     model_type = "Base"
     model_description = "Base model, not implemented"
+    required_modules = []
 
     def __init__(
         self,
     ):
         self.separating = False
+        for module in self.required_modules:
+            if module not in sys.modules:
+                raise ImportError("Module %s is not imported" % module)
 
     def loadModel(self, *args, **kwargs):
         raise NotImplementedError
@@ -581,6 +613,7 @@ class ApolloEnhancer(SeparatorModelBase):
         "Apollo audio restoration, specified for enhancing audio quality compressed by lossy MP3 codec\n"
         "See https://github.com/JusperLee/Apollo for more information"
     )
+    required_modules = ["ApolloCall"]
 
     def loadModel(self, model: str = "apollo", repo: tp.Optional[pathlib.Path] = None):
         self.separator = ApolloCall.Enhancer(model=model, repo=repo)

@@ -254,7 +254,10 @@ class MainWindow(QMainWindow):
 
         self.model_class = {}  # type: dict[str, tuple[separator.SeparatorModelBase, str]]
         for i in separator.available_model_types:
-            model_class = i()
+            try:
+                model_class = i()
+            except Exception:
+                continue
             self.model_class[model_class.model_type] = (model_class, model_class.model_description)
 
         self.timer.singleShot(50, self.showModelSelector)
