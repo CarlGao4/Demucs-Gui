@@ -538,7 +538,11 @@ def checkUpdate(callback):
         with urllib.request.urlopen(update_url) as f:
             data = json.loads(f.read())[0]
         logging.info("Latest version: %s" % data["tag_name"])
-        callback(data["tag_name"])
+        m = re.search(r"<!--\s*\[inapp-info\](.*)\s*-->", data["body"], re.DOTALL)
+        description = ""
+        if m:
+            description = m[1].strip()
+        callback(data["tag_name"], description)
     except Exception:
         logging.warning("Failed to check for updates:\n%s" % traceback.format_exc())
         callback(None)
