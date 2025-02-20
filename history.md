@@ -1,5 +1,11 @@
 Note: Versions in *italic* means that the release is a beta version.
 
+### 1.3.2
+Release date: Reb. 20, 2025
+
+#### Updates
+1. Show update information when checking update
+
 ### 1.3.1
 Release date: Feb. 12, 2025
 
