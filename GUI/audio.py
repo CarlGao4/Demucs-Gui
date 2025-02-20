@@ -115,6 +115,10 @@ def checkFFMpeg():
         return False
 
 
+def gain(audio, gain_db):
+    return audio * 10 ** (gain_db / 20)
+
+
 def read_audio(file, target_sr=None, update_status: tp.Callable[[str], None] = lambda _: None):
     if not isinstance(file, pathlib.Path):
         logging.info("Not local path, skipping soundfile reader")

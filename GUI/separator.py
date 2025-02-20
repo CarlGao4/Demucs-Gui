@@ -53,7 +53,7 @@ class ModelSourceNameUnsupportedError(Exception):
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float, str], None]):
     try:
-        global torch, demucs, audio, has_Intel, Intel_JIT_only, np, ApolloCall
+        global torch, demucs, audio, has_Intel, Intel_JIT_only, np, ApolloCall, gain
         import torch
         import numpy as np
 
@@ -86,6 +86,8 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float,
         import demucs.apply
         import ApolloCall
         import audio
+
+        gain = audio.gain
 
         update_status("Successfully loaded modules")
         logging.info("Demucs version: " + demucs.__version__)
@@ -489,6 +491,7 @@ class DemucsSeparator(SeparatorModelBase):
         self,
         file,
         item,
+        gain,
         segment,
         overlap,
         shifts,
@@ -528,6 +531,8 @@ class DemucsSeparator(SeparatorModelBase):
         self.last_update_eta = 0
 
         self.separator.model.to("cpu")  # To avoid moving between different GPUs which may cause error
+
+        wav = audio.gain(wav, gain)
 
         try:
             updateStatus("Separating audio: %s" % file.name)
@@ -624,6 +629,7 @@ class ApolloEnhancer(SeparatorModelBase):
         self,
         file,
         item,
+        gain,
         segment,
         overlap,
         shifts,
@@ -661,6 +667,8 @@ class ApolloEnhancer(SeparatorModelBase):
         self.file = file
         self.time_hists = []
         self.last_update_eta = 0
+
+        wav = audio.gain(wav, gain)
 
         self.separator.model.to("cpu")  # To avoid moving between different GPUs which may cause error
 

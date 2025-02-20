@@ -351,15 +351,11 @@ class MainWindow(QMainWindow):
     def showParamSettingsFunc(self):
         self.param_settings = SepParamSettings()
         self.save_options = SaveOptions()
-        self.param_settings.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.options_tab = QWidget()
-        self.options_tab.setLayout(QVBoxLayout())
-        self.options_tab.layout().addWidget(self.param_settings)
-        self.options_tab.layout().addWidget(self.save_options)
         self.mixer = Mixer()
         self.file_queue = FileQueue()
         self.separation_control = SeparationControl()
-        self.tab_widget.addTab(self.options_tab, "Options")
+        self.tab_widget.addTab(self.param_settings, self.param_settings.widget_title)
+        self.tab_widget.addTab(self.save_options, self.save_options.widget_title)
         self.tab_widget.addTab(self.mixer, self.mixer.widget_title)
         self.tab_widget.addTab(self.file_queue, self.file_queue.widget_title % self.file_queue.queue_length)
         self.widget_layout.addWidget(self.separation_control)
@@ -854,12 +850,13 @@ class AdvancedModelSettings(QDialog):
         self.hide()
 
 
-class SepParamSettings(QGroupBox):
+class SepParamSettings(QWidget):
+    widget_title = "Separation parameters"
+
     def __init__(self):
         global main_window
 
         super().__init__()
-        self.setTitle("Separation parameters")
 
         self.device_label = QLabel()
         self.device_label.setText("Device:")
@@ -931,6 +928,42 @@ class SepParamSettings(QGroupBox):
         self.default_button.clicked.connect(self.restoreDefaults)
         self.default_button.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
 
+        self.in_gain_label = QLabel()
+        self.in_gain_label.setText("Input gain:")
+        self.in_gain_label.setToolTip("Input gain for the model (before separation)")
+
+        self.in_gain_spinbox = QDoubleSpinBox()
+        self.in_gain_spinbox.setRange(-60.0, 60.0)
+        self.in_gain_spinbox.setSingleStep(0.1)
+        self.in_gain_spinbox.setValue(shared.GetHistory("in_gain", default=0.0))
+        self.in_gain_spinbox.setSuffix(" dB")
+        self.in_gain_spinbox.setDecimals(1)
+
+        self.in_gain_slider = QSlider()
+        self.in_gain_slider.setOrientation(Qt.Orientation.Horizontal)
+        self.in_gain_slider.setRange(-200, 200)
+        self.in_gain_slider.setValue(int(shared.GetHistory("in_gain", default=0.0) * 10))
+        self.in_gain_slider.valueChanged.connect(lambda value: self.in_gain_spinbox.setValue(value / 10))
+        self.in_gain_spinbox.valueChanged.connect(lambda value: self.in_gain_slider.setValue(int(value * 10)))
+
+        self.out_gain_label = QLabel()
+        self.out_gain_label.setText("Output gain:")
+        self.out_gain_label.setToolTip("Output gain for the model (before clipping and encoding, after mixing)")
+
+        self.out_gain_spinbox = QDoubleSpinBox()
+        self.out_gain_spinbox.setRange(-60.0, 60.0)
+        self.out_gain_spinbox.setSingleStep(0.1)
+        self.out_gain_spinbox.setValue(shared.GetHistory("out_gain", default=0.0))
+        self.out_gain_spinbox.setSuffix(" dB")
+        self.out_gain_spinbox.setDecimals(1)
+
+        self.out_gain_slider = QSlider()
+        self.out_gain_slider.setOrientation(Qt.Orientation.Horizontal)
+        self.out_gain_slider.setRange(-200, 200)
+        self.out_gain_slider.setValue(int(shared.GetHistory("out_gain", default=0.0) * 10))
+        self.out_gain_slider.valueChanged.connect(lambda value: self.out_gain_spinbox.setValue(value / 10))
+        self.out_gain_spinbox.valueChanged.connect(lambda value: self.out_gain_slider.setValue(int(value * 10)))
+
         self.separate_once_added = QCheckBox()
         self.separate_once_added.setText("Separate once added")
         self.separate_once_added.setToolTip("Separate the file once it is added to the queue")
@@ -952,9 +985,15 @@ class SepParamSettings(QGroupBox):
         self.widget_layout.addWidget(self.shifts_label, 3, 0)
         self.widget_layout.addWidget(self.shifts_spinbox, 3, 1)
         self.widget_layout.addWidget(self.shifts_slider, 3, 2)
+        self.widget_layout.addWidget(self.in_gain_label, 4, 0)
+        self.widget_layout.addWidget(self.in_gain_spinbox, 4, 1)
+        self.widget_layout.addWidget(self.in_gain_slider, 4, 2)
+        self.widget_layout.addWidget(self.out_gain_label, 5, 0)
+        self.widget_layout.addWidget(self.out_gain_spinbox, 5, 1)
+        self.widget_layout.addWidget(self.out_gain_slider, 5, 2)
         self.check_layout.addWidget(self.separate_once_added)
         self.check_layout.addWidget(self.default_button)
-        self.widget_layout.addLayout(self.check_layout, 4, 0, 1, 3)
+        self.widget_layout.addLayout(self.check_layout, 6, 0, 1, 3)
 
         self.setLayout(self.widget_layout)
 
@@ -966,17 +1005,21 @@ class SepParamSettings(QGroupBox):
         self.overlap_slider.setValue(25)
         self.shifts_spinbox.setValue(0)
         self.shifts_slider.setValue(0)
+        self.in_gain_spinbox.setValue(0.0)
+        self.in_gain_slider.setValue(0)
+        self.out_gain_spinbox.setValue(0.0)
+        self.out_gain_slider.setValue(0)
 
 
-class SaveOptions(QGroupBox):
+class SaveOptions(QWidget):
     SaveLock = threading.Lock()
     ChangeParamEvent = threading.Event()
+    widget_title = "Save options"
 
     def __init__(self):
         global main_window
 
         super().__init__()
-        self.setTitle("Save options")
 
         self.location_label = QLabel()
         self.location_label.setText("Saved file location:")
@@ -1261,6 +1304,8 @@ class SaveOptions(QGroupBox):
                                 file_path = file.parent / file_path_str
                             case 1:
                                 file_path = pathlib.Path(file_path_str)
+                        stem_data = separator.gain(stem_data, main_window.param_settings.out_gain_spinbox.value())
+                        shared.SetHistory("out_gain", value=main_window.param_settings.out_gain_spinbox.value())
                         match self.clip_mode.currentText():
                             case "rescale":
                                 if (peak := stem_data.abs().max()) > 0.999:
@@ -1442,7 +1487,7 @@ class SaveOptions(QGroupBox):
 
     def lockOther(self):
         for i in range(main_window.tab_widget.count()):
-            if main_window.tab_widget.widget(i) not in [self.parent(), main_window.mixer]:
+            if main_window.tab_widget.widget(i) not in [self, main_window.mixer]:
                 main_window.tab_widget.setTabEnabled(i, False)
         main_window.param_settings.setEnabled(False)
         main_window.separation_control.setEnabled(False)
@@ -2315,9 +2360,11 @@ class SeparationControl(QWidget):
         item.setData(ProgressDelegate.ProgressRole, 0)
         item.setData(ProgressDelegate.TextRole, "")
         main_window.save_options.encoder_ffmpeg_box.setEnabled(False)
+        shared.SetSetting("in_gain", main_window.param_settings.in_gain_spinbox.value())
         main_window.separator.startSeparate(
             file,
             item,
+            main_window.param_settings.in_gain_spinbox.value(),
             main_window.param_settings.segment_spinbox.value(),
             main_window.param_settings.overlap_spinbox.value(),
             main_window.param_settings.shifts_spinbox.value(),
