@@ -27,6 +27,7 @@ import json
 import logging
 import lzma
 import ordered_set
+import packaging.version
 import pathlib
 import pickle
 import re
@@ -558,13 +559,14 @@ def checkUpdate(callback):
     try:
         logging.info("Checking for updates...")
         with urllib.request.urlopen(update_url) as f:
-            data = json.loads(f.read())[0]
-        logging.info("Latest version: %s" % data["tag_name"])
-        m = re.search(r"<!--\s*\[inapp-info\](.*)\s*-->", data["body"], re.DOTALL)
+            data = json.loads(f.read())[:3]  # Get the latest 3 releases so we can also check for pre-releases
+        data = sorted(data, key=lambda x: packaging.version.parse(x["tag_name"]), reverse=True)
+        logging.info("Latest version: %s" % data[0]["tag_name"])
+        m = re.search(r"<!--\s*\[inapp-info\](.*)\s*-->", data[0]["body"], re.DOTALL)
         description = ""
         if m:
             description = m[1].strip()
-        callback(data["tag_name"], description)
+        callback(data[0]["tag_name"], description)
     except Exception:
         logging.warning("Failed to check for updates:\n%s" % traceback.format_exc())
         callback(None)
