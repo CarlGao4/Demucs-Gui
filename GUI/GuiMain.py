@@ -504,6 +504,8 @@ class MainWindow(QMainWindow):
                     self, "Check for update failed", "Failed to check for update. Check log file for details."
                 )
             return
+        if new_version in shared.GetHistory("skip_version", use_ordered_set=True) and not show:
+            return
         version_new = packaging.version.Version(new_version)
         if version_new <= packaging.version.Version(__version__):
             if show:
@@ -515,11 +517,18 @@ class MainWindow(QMainWindow):
         message += "Do you want to visit GitHub to download it?"
         if version_new.is_prerelease:
             message += "\nWarning: this is a pre-release version."
-        if (
-            self.m.question(self, "Update available", message, self.m.StandardButton.Yes, self.m.StandardButton.No)
-            == self.m.StandardButton.Yes
-        ):
+        m = QMessageBox(self)
+        m.setWindowTitle("Update available")
+        m.setText(message)
+        m.setIcon(m.Icon.Question)
+        never = m.addButton("Skip this version", m.ButtonRole.DestructiveRole)
+        yes = m.addButton("Yes", m.ButtonRole.AcceptRole)
+        no = m.addButton("No", m.ButtonRole.RejectRole)
+        m.exec()
+        if m.clickedButton() == yes:
             webbrowser.open("https://github.com/CarlGao4/Demucs-Gui/releases")
+        elif m.clickedButton() == never:
+            shared.AddHistory("skip_version", value=str(new_version))
 
     def clear_history(self):
         if (

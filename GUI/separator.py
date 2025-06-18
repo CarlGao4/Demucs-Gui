@@ -390,7 +390,7 @@ class DemucsSeparator(SeparatorModelBase):
                     if "segment" in model_def:
                         info += "\nDefault segment: %.1f" % model_def["segment"]
                 except Exception:
-                    logging.error("Failed to load info of model %s:\n%s" % (sig, traceback.format_exc()))
+                    logging.error("Failed to load info of demucs model %s:\n%s" % (sig, traceback.format_exc()))
                 else:
                     demucs_remote_urls[sig] = model_def["models"]
                     bags.append((sig, info, repopath))
@@ -637,7 +637,7 @@ class ApolloEnhancer(SeparatorModelBase):
             try:
                 new_models = ApolloCall.list_models(repo)
             except Exception:
-                logging.error("Failed to list models from %s:\n%s" % (str(repo), traceback.format_exc()))
+                logging.error("Failed to list apollo models from %s:\n%s" % (str(repo), traceback.format_exc()))
                 continue
             for model in new_models:
                 if (file := (repo / (model + ".bin"))).exists():
