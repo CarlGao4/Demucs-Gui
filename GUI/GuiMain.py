@@ -1066,6 +1066,13 @@ class SaveOptions(QWidget):
         self.browse_button.clicked.connect(self.browseLocation)
         self.browse_button.setEnabled(self.location_group.checkedId() == 1)
         self.location_group.idToggled.connect(lambda Id, checked: self.browse_button.setEnabled(not Id ^ checked))
+        self.overwrite_label = QLabel()
+        self.overwrite_label.setText("Overwrite strategy:")
+        self.overwrite_label.setToolTip("Select the overwrite strategy for existing files")
+        self.overwrite_strategy = QComboBox()
+        self.overwrite_strategy.addItems(["overwrite", "skip", "rename", "ask"])
+        self.overwrite_strategy.setCurrentText(shared.GetHistory("overwrite_strategy", default="skip"))
+        self.overwrite_strategy.currentTextChanged.connect(lambda x: shared.SetHistory("overwrite_strategy", value=x))
 
         self.clip_mode_label = QLabel()
         self.clip_mode_label.setText("Clip mode:")
@@ -1199,9 +1206,11 @@ class SaveOptions(QWidget):
         self.widget_layout.addWidget(self.loc_absolute_path_button, 1, 1)
         self.widget_layout.addWidget(self.browse_button, 1, 2)
         self.widget_layout.addWidget(self.loc_input, 2, 0, 1, 3)
-        self.widget_layout.addWidget(line, 3, 0, 1, 3)
-        self.widget_layout.addWidget(self.clip_mode_label, 4, 0, 1, 2)
-        self.widget_layout.addWidget(self.clip_mode, 4, 2)
+        self.widget_layout.addWidget(self.overwrite_label, 3, 0, 1, 2)
+        self.widget_layout.addWidget(self.overwrite_strategy, 3, 2)
+        self.widget_layout.addWidget(line, 4, 0, 1, 3)
+        self.widget_layout.addWidget(self.clip_mode_label, 5, 0, 1, 2)
+        self.widget_layout.addWidget(self.clip_mode, 5, 2)
         self.encoder_sndfile_layout.addWidget(self.file_format_label, 0, 0, 1, 2)
         self.encoder_sndfile_layout.addWidget(self.file_format, 0, 2)
         self.encoder_sndfile_layout.addWidget(self.sample_fmt_label, 1, 0, 1, 2)
@@ -1222,9 +1231,9 @@ class SaveOptions(QWidget):
         self.setLayout(self.widget_layout)
 
         if separator.audio.ffmpeg_available:
-            self.widget_layout.addWidget(self.encoder_selector_label, 5, 0)
-            self.widget_layout.addWidget(self.encoder_selector_sndfile, 5, 1)
-            self.widget_layout.addWidget(self.encoder_selector_ffmpeg, 5, 2)
+            self.widget_layout.addWidget(self.encoder_selector_label, 6, 0)
+            self.widget_layout.addWidget(self.encoder_selector_sndfile, 6, 1)
+            self.widget_layout.addWidget(self.encoder_selector_ffmpeg, 6, 2)
             self.switchEncoder(shared.GetHistory("encoder", default=0))
         else:
             self.encoder_group.button(0).setChecked(True)
@@ -1232,9 +1241,9 @@ class SaveOptions(QWidget):
         self.switchFFmpegPreset()
         self.saving = 0
 
-        self.widget_layout.addWidget(line2, 7, 0, 1, 3)
-        self.widget_layout.addWidget(self.retry_on_error, 8, 0, 1, 2)
-        self.widget_layout.addWidget(self.retry_button, 8, 2)
+        self.widget_layout.addWidget(line2, 8, 0, 1, 3)
+        self.widget_layout.addWidget(self.retry_on_error, 9, 0, 1, 2)
+        self.widget_layout.addWidget(self.retry_button, 9, 2)
 
         self.ChangeParamEvent.set()
 
@@ -1249,10 +1258,10 @@ class SaveOptions(QWidget):
         self.encoder_ffmpeg_box.hide()
         match Id:
             case 0:
-                self.widget_layout.addWidget(self.encoder_sndfile_box, 6, 0, 1, 3)
+                self.widget_layout.addWidget(self.encoder_sndfile_box, 7, 0, 1, 3)
                 self.encoder_sndfile_box.show()
             case 1:
-                self.widget_layout.addWidget(self.encoder_ffmpeg_box, 6, 0, 1, 3)
+                self.widget_layout.addWidget(self.encoder_ffmpeg_box, 7, 0, 1, 3)
                 self.encoder_ffmpeg_box.show()
 
     @shared.thread_wrapper(daemon=True)
@@ -1333,6 +1342,22 @@ class SaveOptions(QWidget):
                         ret = traceback.format_exc()
                         break
                     try:
+                        if file_path.exists():
+                            if self.overwrite_strategy.currentText() == "skip":
+                                logging.info("File %s already exists, skipping due to overwrite strategy." % file_path)
+                                main_window.file_queue.set_cell_item_data(
+                                    item, "outputs", stem, "file", value=file_path
+                                )
+                                main_window.file_queue.set_cell_item_data(
+                                    item, "outputs", stem, "status", value=shared.FileStatus.Skipped
+                                )
+                                continue
+                            elif self.overwrite_strategy.currentText() == "ask":
+                                ret = "File %s already exists" % file_path
+                                raise FileExistsError(ret)
+                            elif self.overwrite_strategy.currentText() == "rename":
+                                file_path = shared.get_unique_filename(file_path)
+                                logging.info("File %s already exists, renaming to %s." % (file_path, file_path))
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         match self.encoder_group.checkedId():
                             case 0:
@@ -1354,6 +1379,9 @@ class SaveOptions(QWidget):
                                 ]
                                 logging.info("Saving file %s with command %s" % (file_path, command))
                                 ret = save_func(command, data, encoder="ffmpeg")
+                                main_window.file_queue.set_cell_item_data(
+                                    item, "outputs", stem, "file", value=file_path
+                                )
                     except Exception:
                         logging.error("Failed to save file %s:\n%s" % (file_path, traceback.format_exc()))
                         ret = traceback.format_exc()
@@ -1537,7 +1565,7 @@ class FileQueue(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
         self.table.setHorizontalHeaderLabels(["File", "Status"])
-        self.table.setColumnWidth(1, 80)
+        self.table.setColumnWidth(1, 100)
         self.table.horizontalHeaderItem(0).setToolTip("Click here to toggle file name/full path")
 
         self.table.setAcceptDrops(True)
@@ -1652,6 +1680,38 @@ class FileQueue(QWidget):
             if item is not None:
                 item.setData(Qt.ItemDataRole.UserRole + 0x100, random.random())
 
+    def set_cell_data(self, row, column, *keys, value):
+        """Set data for a cell in the table"""
+        item = self.table.item(row, column)
+        if item is None:
+            raise ValueError(f"No item found at row {row}, column {column}")
+        if not isinstance(item, QTableWidgetItem):
+            raise TypeError(f"Item at row {row}, column {column} is not a QTableWidgetItem")
+        if not keys:
+            raise ValueError("At least one key must be provided")
+        self.set_cell_item_data(item, *keys, value=value)
+
+    def set_cell_item_data(self, item, *keys, value):
+        """Set data for a cell item in the table"""
+        if not isinstance(item, QTableWidgetItem):
+            raise TypeError("Item must be a QTableWidgetItem")
+        if not keys:
+            raise ValueError("At least one key must be provided")
+        current_value = item.data(Qt.ItemDataRole.UserRole)
+        if current_value is None:
+            current_value = {}
+        data_layer = current_value
+        if not isinstance(data_layer, dict):
+            raise TypeError("Current value is not a dictionary")
+        for idx, key in enumerate(keys[:-1]):
+            if key not in data_layer:
+                data_layer[key] = {}
+            if not isinstance(data_layer[key], dict):
+                raise TypeError(f"Key {str(keys[:idx + 1])} is not a dictionary")
+            data_layer = data_layer[key]
+        data_layer[keys[-1]] = value
+        item.setData(Qt.ItemDataRole.UserRole, current_value)
+
     def addFiles(self, files):
         global main_window
         files = map(pathlib.Path, (i for i in files if len(i)))
@@ -1676,8 +1736,8 @@ class FileQueue(QWidget):
                         self.table.setItem(row, 0, QTableWidgetItem(file.name))
                     self.table.setItem(row, 1, QTableWidgetItem())
                     self.table.item(row, 0).setToolTip(str(file))
-                    self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, file)
-                    self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                    self.set_cell_data(row, 0, "path", value=file)
+                    self.set_cell_data(row, 1, "status", value=shared.FileStatus.Queued)
                     self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
                     self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
                     self.queue_length += 1
@@ -1692,7 +1752,7 @@ class FileQueue(QWidget):
             self.new_url_event.clear()
             while self.loadURLname_queue:
                 item = self.loadURLname_queue.pop(0)  # type: QTableWidgetItem
-                url = item.data(Qt.ItemDataRole.UserRole)
+                url = item.data(Qt.ItemDataRole.UserRole)["path"]
                 if isinstance(url, shared.URL_with_filename):
                     url.name
                 if self.show_full_path:
@@ -1747,8 +1807,8 @@ class FileQueue(QWidget):
                 self.new_url_event.set()
                 self.table.setItem(row, 1, QTableWidgetItem())
                 self.table.item(row, 0).setToolTip(str(url))
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, url)
-                self.table.item(row, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                self.set_cell_data(row, 0, "path", value=url)
+                self.set_cell_data(row, 1, "status", value=shared.FileStatus.Queued)
                 self.table.item(row, 1).setData(ProgressDelegate.ProgressRole, 0)
                 self.table.item(row, 1).setData(ProgressDelegate.TextRole, "Queued")
                 self.queue_length += 1
@@ -1778,11 +1838,11 @@ class FileQueue(QWidget):
         if self.show_full_path:
             for i in range(self.table.rowCount()):
                 item = self.table.item(i, 0)
-                item.setText(str(item.data(Qt.ItemDataRole.UserRole)))
+                item.setText(str(item.data(Qt.ItemDataRole.UserRole)["path"]))
         else:
             for i in range(self.table.rowCount()):
                 item = self.table.item(i, 0)
-                if isinstance(p := item.data(Qt.ItemDataRole.UserRole), pathlib.Path):
+                if isinstance(p := item.data(Qt.ItemDataRole.UserRole)["path"], pathlib.Path):
                     item.setText(p.name)
                 elif isinstance(p, shared.URL_with_filename):
                     item.setText("%s [URL]" % p.name)
@@ -1794,7 +1854,7 @@ class FileQueue(QWidget):
     def removeFiles(self):
         indexes = sorted(list(set(i.row() for i in self.table.selectedIndexes())), reverse=True)
         for i in indexes:
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] not in [
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] not in [
                 shared.FileStatus.Paused,
                 shared.FileStatus.Queued,
                 shared.FileStatus.Finished,
@@ -1802,7 +1862,7 @@ class FileQueue(QWidget):
                 shared.FileStatus.Failed,
             ]:
                 continue
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] in [
                 shared.FileStatus.Queued,
                 shared.FileStatus.Paused,
             ]:
@@ -1813,31 +1873,31 @@ class FileQueue(QWidget):
     def pause(self):
         indexes = list(set(i.row() for i in self.table.selectedIndexes()))
         for i in indexes:
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
-                self.table.item(i, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Paused])
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] == shared.FileStatus.Queued:
+                self.set_cell_data(i, 1, "status", value=shared.FileStatus.Paused)
                 self.table.item(i, 1).setData(ProgressDelegate.TextRole, "Paused")
 
     def resume(self):
         indexes = list(set(i.row() for i in self.table.selectedIndexes()))
         for i in indexes:
-            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+            if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] in [
                 shared.FileStatus.Paused,
                 shared.FileStatus.Cancelled,
                 shared.FileStatus.Failed,
             ]:
-                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] in [
+                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] in [
                     shared.FileStatus.Cancelled,
                     shared.FileStatus.Failed,
                 ]:
                     self.queue_length += 1
                     main_window.updateQueueLength()
-                self.table.item(i, 1).setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Queued])
+                self.set_cell_data(i, 1, "status", value=shared.FileStatus.Queued)
                 self.table.item(i, 1).setData(ProgressDelegate.TextRole, "Queued")
 
     def moveTop(self):
         indexes = sorted(list(set(i.row() for i in self.table.selectedIndexes())))
         for i, index in enumerate(indexes):
-            if self.table.item(index, 1).data(Qt.ItemDataRole.UserRole)[0] not in [
+            if self.table.item(index, 1).data(Qt.ItemDataRole.UserRole)["status"] not in [
                 shared.FileStatus.Paused,
                 shared.FileStatus.Queued,
             ]:
@@ -1851,7 +1911,7 @@ class FileQueue(QWidget):
         with file_queue_lock:
             self.setEnabled(False)
             for i in range(self.table.rowCount()):
-                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)[0] == shared.FileStatus.Queued:
+                if self.table.item(i, 1).data(Qt.ItemDataRole.UserRole)["status"] == shared.FileStatus.Queued:
                     self.setEnabled(True)
                     return i
             self.setEnabled(True)
@@ -2279,7 +2339,8 @@ class SeparationControl(QWidget):
     def setAudioProgressEmit(self, value, item: QTableWidgetItem):
         self.current_audio_progressbar.setValue(int(value * 65536))
         item.setData(ProgressDelegate.ProgressRole, value)
-        item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Separating, value])
+        main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Separating)
+        main_window.file_queue.set_cell_item_data(item, "progress", value=value)
         item.setData(ProgressDelegate.TextRole, "")
 
     def setModelProgress(self, value):
@@ -2305,7 +2366,7 @@ class SeparationControl(QWidget):
         self.setAudioProgressSignal.emit(value, item)
 
     def setStatusForItem(self, status, item: QTableWidgetItem):
-        item.setData(Qt.ItemDataRole.UserRole, [status])
+        main_window.file_queue.set_cell_item_data(item, "status", value=status)
         match status:
             case shared.FileStatus.Reading:
                 item.setData(ProgressDelegate.TextRole, "Reading")
@@ -2316,21 +2377,32 @@ class SeparationControl(QWidget):
         match status:
             case shared.FileStatus.Finished:
                 item.setData(ProgressDelegate.TextRole, "Finished")
-                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Finished])
+                main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Finished)
                 main_window.setStatusText.emit(
                     "Separation finished: %s" % main_window.file_queue.table.item(item.row(), 0).text()
                 )
+                skipped_stems = []
+                outputs_data = item.data(Qt.ItemDataRole.UserRole)["outputs"]
+                for k, v in outputs_data.items():
+                    if "status" in v and v["status"] == shared.FileStatus.Skipped:
+                        skipped_stems.append(k)
+                if skipped_stems:
+                    item.setData(ProgressDelegate.TextRole, "Outfile Skipped")
+                    item.setToolTip(
+                        "Some stems were skipped due to the output file already existing.\n"
+                        "Skipped stems: %s" % ", ".join(skipped_stems)
+                    )
             case shared.FileStatus.Failed:
                 item.setData(ProgressDelegate.TextRole, "Failed")
-                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Failed])
+                main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Failed)
                 item.setData(ProgressDelegate.ProgressRole, 0)
             case shared.FileStatus.Cancelled:
                 item.setData(ProgressDelegate.TextRole, "Cancelled")
-                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Cancelled])
+                main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Cancelled)
                 item.setData(ProgressDelegate.ProgressRole, 0)
             case shared.FileStatus.Writing:
                 item.setData(ProgressDelegate.TextRole, "Writing")
-                item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Writing])
+                main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Writing)
         if self.stop_now:
             self.stop_now = False
         if status not in [shared.FileStatus.Writing]:
@@ -2364,9 +2436,9 @@ class SeparationControl(QWidget):
                     'Command does not contain "-v" for ffmpeg encoder. May output too much information to log file.',
                 )
         self.start_button.setEnabled(False)
-        file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)
+        file = main_window.file_queue.table.item(index, 0).data(Qt.ItemDataRole.UserRole)["path"]
         item = main_window.file_queue.table.item(index, 1)
-        item.setData(Qt.ItemDataRole.UserRole, [shared.FileStatus.Separating])
+        main_window.file_queue.set_cell_item_data(item, "status", value=shared.FileStatus.Separating)
         item.setData(ProgressDelegate.ProgressRole, 0)
         item.setData(ProgressDelegate.TextRole, "")
         main_window.save_options.encoder_ffmpeg_box.setEnabled(False)
