@@ -362,6 +362,28 @@ class FileStatus:
     Finished = 5
     Failed = 6
     Cancelled = 7
+    Skipped = 8
+
+
+def get_unique_filename(filepath: pathlib.Path) -> pathlib.Path:
+    """Generate a unique filename by appending a number to the stem if it already exists."""
+    if not filepath.exists():
+        return filepath
+
+    stem = filepath.stem
+    suffix = filepath.suffix
+    counter = 2
+
+    if m := re.search(r" *\((\d+)\)$", stem):
+        # If the stem ends with a number in parentheses, start from that number + 1
+        counter = int(m.group(1)) + 1
+        stem = stem[: -len(m.group(0))]
+
+    while filepath.exists():
+        filepath = filepath.with_stem(f"{stem} ({counter})").with_suffix(suffix)
+        counter += 1
+
+    return filepath
 
 
 def re_sub_remove_file(m: re.Match):

@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import hashlib
+import importlib
 import json
 import logging
 import os
@@ -42,18 +43,44 @@ used_xpu = False
 has_Intel = False
 Intel_JIT_only = False
 
-downloaded_models = {}
-remote_urls = {}
+demuce_downloaded_models = {}
+demucs_remote_urls = {}
 
 
 class ModelSourceNameUnsupportedError(Exception):
     pass
 
 
+def try_import(module):
+    """Try to import a module and make it available in the global scope."""
+    if "." in module and module[0] != ".":
+        try_import(module.rsplit(".", 1)[0])
+        importlib.import_module(module)
+        return
+    if module[0] == ".":
+        try:
+            globals()[module[1:]] = importlib.import_module(module)
+        except ImportError:
+            logging.error("Failed to import %s:\n%s" % (module, traceback.format_exc()))
+    else:
+        try:
+            globals()[module] = importlib.import_module(module)
+        except ImportError:
+            logging.error("Failed to import %s:\n%s" % (module, traceback.format_exc()))
+
+
+def global_module_for_linter():
+    """A useless function to make linter recognize global modules."""
+    global demucs, ApolloCall
+    import demucs.api
+    import demucs.apply
+    import ApolloCall
+
+
 @shared.thread_wrapper(daemon=True)
 def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float, str], None]):
     try:
-        global torch, demucs, audio, has_Intel, Intel_JIT_only, np
+        global torch, audio, has_Intel, Intel_JIT_only, np, gain
         import torch
         import numpy as np
 
@@ -82,9 +109,13 @@ def starter(update_status: tp.Callable[[str], None], finish: tp.Callable[[float,
                             logging.info("IPEX extension dll is not large enough, probably JIT only (No AOT)")
                             Intel_JIT_only = True
                     break
-        import demucs.api
-        import demucs.apply
+        try_import("demucs.api")
+        try_import("demucs.apply")
+        try_import("ApolloCall")
+
         import audio
+
+        gain = audio.gain
 
         update_status("Successfully loaded modules")
         logging.info("Demucs version: " + demucs.__version__)
@@ -172,79 +203,6 @@ def getAvailableDevices():
     return devices
 
 
-def autoListModels():
-    global downloaded_models, remote_urls
-    bags = []
-    singles = []
-    custom_repo = shared.GetSetting("custom_repo", [])
-    repos = [shared.homeDir / "pretrained", shared.pretrained]
-    repos += [pathlib.Path(i) for i in custom_repo]
-    repos += [None]
-    try:
-        torch.hub.set_dir(shared.model_cache)
-        checkpoint_dir = shared.model_cache / "checkpoints"
-        downloaded_models = demucs.api.list_models(checkpoint_dir)["single"]
-    except Exception:
-        logging.error("Failed to list downloaded models:\n%s" % traceback.format_exc())
-    for repopath in repos:
-        if repopath is not None and not repopath.exists():
-            continue
-        try:
-            new_models = demucs.api.list_models(repopath)
-        except Exception:
-            logging.error("Failed to list models from %s:\n%s" % (str(repopath), traceback.format_exc()))
-            continue
-        for sig, filepath in new_models["bag"].items():
-            info = "Model signature: " + sig
-            info += "\nType: Bag of models"
-            if repopath is None:
-                info += "\nPosition: Remote model"
-            else:
-                info += "\nPosition: Local model"
-                info += "\nRepo: " + str(repopath)
-            info += "\nFile: " + str(filepath)
-            try:
-                with open(filepath, "rt", encoding="utf8") as f:
-                    model_def = yaml.load(f, yaml.Loader)
-                info += "\nModels:"
-                if "weights" in model_def:
-                    weights = model_def["weights"]
-                    for i, (model, weight) in enumerate(zip(model_def["models"], weights)):
-                        info += "\n\u3000%d. %s: %s" % (i + 1, model, weight)
-                        if repopath is None:
-                            info += " (Downloaded)" if model in downloaded_models else " (Not downloaded)"
-                else:
-                    for i, model in enumerate(model_def["models"]):
-                        info += "\n\u3000%d. %s" % (i + 1, model)
-                        if repopath is None:
-                            info += " (Downloaded)" if model in downloaded_models else " (Not downloaded)"
-                if "segment" in model_def:
-                    info += "\nDefault segment: %.1f" % model_def["segment"]
-            except Exception:
-                logging.error("Failed to load info of model %s:\n%s" % (sig, traceback.format_exc()))
-            else:
-                remote_urls[sig] = model_def["models"]
-                bags.append((sig, info, repopath))
-        for sig, filepath in new_models["single"].items():
-            info = "Model signature: " + sig
-            info += "\nType: Single model"
-            if repopath is None:
-                info += "\nPosition: Remote model"
-                info += "\nURL: " + str(filepath)
-                info += "\nState: " + ("Downloaded" if sig in downloaded_models else "Not downloaded")
-                if sig in downloaded_models:
-                    info += "\nFile: " + str(downloaded_models[sig])
-                else:
-                    remote_urls[sig] = str(filepath)
-            else:
-                info += "\nPosition: Local model"
-                info += "\nRepo: " + str(repopath)
-                info += "\nFile: " + str(filepath)
-            singles.append((sig, info, repopath))
-    models, infos, each_repos = tuple(zip(*(bags + singles + [("demucs_unittest", "Unit test model", None)])))
-    return models, infos, each_repos
-
-
 def empty_cache():
     if used_cuda:
         for _ in range(10):
@@ -254,17 +212,104 @@ def empty_cache():
             torch.xpu.empty_cache()
 
 
-class Separator:
+def setUpdateStatusFunc(func):
+    global updateStatus
+    if callable(func):
+        updateStatus = func
+    else:
+        updateStatus = lambda *_: None
+
+
+class SeparatorModelBase:
+    model_type = "Base"
+    model_description = "Base model, not implemented"
+    required_modules = []
+
     def __init__(
         self,
-        model: str = "htdemucs",
-        repo: tp.Optional[pathlib.Path] = None,
-        updateStatus: tp.Optional[tp.Callable[[str], None]] = None,
     ):
-        if callable(updateStatus):
-            self.updateStatus = updateStatus
-        else:
-            self.updateStatus = lambda *_: None
+        self.separating = False
+        for module in self.required_modules:
+            if module not in sys.modules:
+                raise ImportError("Module %s is not imported" % module)
+
+    def loadModel(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def listModels(self):
+        raise NotImplementedError
+
+    def modelInfo(self):
+        raise NotImplementedError
+
+    def startSeparate(self, *args, **kwargs):
+        if self.separating:
+            return
+        self.separating = True
+        self.separate(*args, **kwargs)
+
+    @shared.thread_wrapper(daemon=True)
+    def separate(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def updateProgress(self, progress_dict):
+        progress = Fraction(0)
+        progress_per_model = Fraction(1, progress_dict["models"])
+        progress_per_shift = Fraction(1, max(1, self.shifts))
+        progress += progress_per_model * progress_dict["model_idx_in_bag"]
+        progress_model = Fraction(0)
+        progress_model += progress_per_shift * progress_dict["shift_idx"]
+        progress_shift = Fraction(progress_dict["segment_offset"], progress_dict["audio_length"])
+        if progress_dict["state"] == "end":
+            progress_shift += Fraction(
+                int(self.segment * (1 - self.overlap) * self.samplerate), progress_dict["audio_length"]
+            )
+        progress_shift = min(Fraction(1, 1), progress_shift)
+        progress_model += progress_per_shift * progress_shift
+        progress += progress_model * progress_per_model
+        progress *= Fraction(1, self.in_length)
+        progress += Fraction(self.out_length, self.in_length)
+        current_time = time.time()
+        self.time_hists.append((current_time, progress))
+        if current_time - self.last_update_eta > 0.5:
+            while len(self.time_hists) >= 20 and current_time - self.time_hists[0][0] > 15:
+                self.time_hists.pop(0)
+            if len(self.time_hists) >= 2 and progress != self.time_hists[0][1]:
+                eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
+            else:
+                eta = 1000000000
+            if eta >= 99 * 86400:
+                eta_str = "--:--:--:--"
+            elif eta >= 86400:
+                eta_str = "%d:" % (eta // 86400)
+                eta %= 86400
+                eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
+            else:
+                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
+            updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
+            self.last_update_eta = current_time
+        pause_start = time.time()
+        self.setModelProgress(min(1.0, float(progress_shift)))
+        self.setAudioProgress(min(1.0, float(progress)), self.item)
+        pause_end = time.time()
+        self.time_hists = [(i[0] + pause_end - pause_start, i[1]) for i in self.time_hists]
+
+    def save_callback(self, *args, encoder="sndfile"):
+        match encoder:
+            case "sndfile":
+                return audio.save_audio_sndfile(*args, self.samplerate, updateStatus)
+            case "ffmpeg":
+                return audio.save_audio_ffmpeg(*args, self.samplerate, updateStatus)
+
+
+class DemucsSeparator(SeparatorModelBase):
+    model_type = "Demucs"
+    model_description = (
+        "Demucs music source separation model (including Demucs, HDemucs v3, HTDemucs v4)\n"
+        "See https://github.com/adefossez/demucs for more information"
+    )
+
+    def loadModel(self, model: str = "htdemucs", repo: tp.Optional[pathlib.Path] = None):
         if repo is None:
             self.ensureDownloaded(model)
         self.separator = demucs.api.Separator(model=model, repo=repo, progress=False)
@@ -278,34 +323,114 @@ class Separator:
             raise ModelSourceNameUnsupportedError("Source name 'all_left' is reserved in model %s" % model)
         self.model = model
         self.repo = repo
+        self.max_segment = 3600
         if not isinstance(self.separator.model, demucs.apply.BagOfModels):
             self.default_segment = self.separator.model.segment
+            if isinstance(self.separator.model, demucs.apply.HTDemucs):
+                self.max_segment = self.default_segment
         else:
             self.default_segment = min(i.segment for i in self.separator.model.models)  # type: ignore
             if hasattr(self.separator.model, "segment"):
                 self.default_segment = min(self.default_segment, self.separator.model.segment)
+            for i in self.separator.model.models:
+                if isinstance(i, demucs.apply.HTDemucs):
+                    self.max_segment = min(self.max_segment, i.segment)
         self.default_segment = max(self.default_segment, 0.1)
+        if self.default_segment > self.max_segment:
+            self.default_segment = self.max_segment
         self.sources = self.separator.model.sources
-        self.separating = False
+        self.samplerate = self.separator.model.samplerate
+
+    def listModels(self):
+        global demuce_downloaded_models, demucs_remote_urls
+        bags = []
+        singles = []
+        custom_repo = shared.GetSetting("custom_repo", [])
+        repos = [shared.homeDir / "pretrained", shared.pretrained]
+        repos += [pathlib.Path(i) for i in custom_repo]
+        repos += [None]
+        try:
+            torch.hub.set_dir(shared.model_cache)
+            checkpoint_dir = shared.model_cache / "checkpoints"
+            demuce_downloaded_models = demucs.api.list_models(checkpoint_dir)["single"]
+        except Exception:
+            logging.error("Failed to list downloaded models:\n%s" % traceback.format_exc())
+        for repopath in repos:
+            if repopath is not None and not repopath.exists():
+                continue
+            try:
+                new_models = demucs.api.list_models(repopath)
+            except Exception:
+                logging.error("Failed to list models from %s:\n%s" % (str(repopath), traceback.format_exc()))
+                continue
+            for sig, filepath in new_models["bag"].items():
+                info = "Model signature: " + sig
+                info += "\nType: Bag of models"
+                if repopath is None:
+                    info += "\nPosition: Remote model"
+                else:
+                    info += "\nPosition: Local model"
+                    info += "\nRepo: " + str(repopath)
+                info += "\nFile: " + str(filepath)
+                try:
+                    with open(filepath, "rt", encoding="utf8") as f:
+                        model_def = yaml.load(f, yaml.Loader)
+                    info += "\nModels:"
+                    if "weights" in model_def:
+                        weights = model_def["weights"]
+                        for i, (model, weight) in enumerate(zip(model_def["models"], weights)):
+                            info += "\n\u3000%d. %s: %s" % (i + 1, model, weight)
+                            if repopath is None:
+                                info += " (Downloaded)" if model in demuce_downloaded_models else " (Not downloaded)"
+                    else:
+                        for i, model in enumerate(model_def["models"]):
+                            info += "\n\u3000%d. %s" % (i + 1, model)
+                            if repopath is None:
+                                info += " (Downloaded)" if model in demuce_downloaded_models else " (Not downloaded)"
+                    if "segment" in model_def:
+                        info += "\nDefault segment: %.1f" % model_def["segment"]
+                except Exception:
+                    logging.error("Failed to load info of demucs model %s:\n%s" % (sig, traceback.format_exc()))
+                else:
+                    demucs_remote_urls[sig] = model_def["models"]
+                    bags.append((sig, info, repopath))
+            for sig, filepath in new_models["single"].items():
+                info = "Model signature: " + sig
+                info += "\nType: Single model"
+                if repopath is None:
+                    info += "\nPosition: Remote model"
+                    info += "\nURL: " + str(filepath)
+                    info += "\nState: " + ("Downloaded" if sig in demuce_downloaded_models else "Not downloaded")
+                    if sig in demuce_downloaded_models:
+                        info += "\nFile: " + str(demuce_downloaded_models[sig])
+                    else:
+                        demucs_remote_urls[sig] = str(filepath)
+                else:
+                    info += "\nPosition: Local model"
+                    info += "\nRepo: " + str(repopath)
+                    info += "\nFile: " + str(filepath)
+                singles.append((sig, info, repopath))
+        models, infos, each_repos = tuple(zip(*(bags + singles + [("demucs_unittest", "Unit test model", None)])))
+        return models, infos, each_repos
 
     def ensureDownloaded(self, model):
         if model == "demucs_unittest":
             return
-        if model in downloaded_models:
+        if model in demuce_downloaded_models:
             return
-        if isinstance(remote_urls[model], list):
-            for i in remote_urls[model]:
+        if isinstance(demucs_remote_urls[model], list):
+            for i in demucs_remote_urls[model]:
                 self.ensureDownloaded(i)
             return
         # Download codes modified from torch.hub
         try:
-            url = remote_urls[model]
+            url = demucs_remote_urls[model]
         except KeyError:
             err = "Model %s not found\n" % model
-            err += "Downloaded models: " + json.dumps(downloaded_models)
-            err += "\nRemote models: " + json.dumps(remote_urls)
+            err += "Downloaded models: " + json.dumps(demuce_downloaded_models)
+            err += "\nRemote models: " + json.dumps(demucs_remote_urls)
             raise RuntimeError(err)
-        self.updateStatus("Downloading model %s" % model)
+        updateStatus("Downloading model %s" % model)
         logging.info("Downloading model %s from %s" % (model, url))
         next_update = 0.0
         req = urllib.request.Request(url, headers={"User-Agent": "torch.hub"})
@@ -343,7 +468,7 @@ class Separator:
                     shared.HSize(file_size),
                     file_size_dl * 100.0 / file_size,
                 )
-                self.updateStatus(status)
+                updateStatus(status)
                 next_update = time.time() + 0.5
         f.close()
         if checksum is not None:
@@ -353,12 +478,11 @@ class Separator:
                     "Checksum mismatch for %s: received %s, expected %s" % (model, hasher.hexdigest(), checksum)
                 )
                 raise RuntimeError("Checksum mismatch")
-        self.updateStatus("Downloaded model %s" % model)
+        updateStatus("Downloaded model %s" % model)
         shutil.move(str(tmp_file), str(tmp_file.parent / file_name))
 
     def modelInfo(self):
         channels = self.separator.model.audio_channels
-        samplerate = self.separator.model.samplerate
         if isinstance(self.separator.model, demucs.apply.BagOfModels):
             infos = []
             weights = self.separator.model.weights
@@ -379,7 +503,7 @@ class Separator:
                     self.model,
                     self.repo if self.repo is not None else '"remote"',
                     channels,
-                    samplerate,
+                    self.samplerate,
                     ", ".join(self.sources),
                     "\n".join(infos),
                 )
@@ -390,70 +514,16 @@ class Separator:
             self.repo if self.repo is not None else '"remote"',
             self.separator.model.__class__.__name__,
             channels,
-            samplerate,
+            self.samplerate,
             ", ".join(self.sources),
         )
-
-    def startSeparate(self, *args, **kwargs):
-        if self.separating:
-            return
-        self.separating = True
-        self.separate(*args, **kwargs)
-
-    def updateProgress(self, progress_dict):
-        progress = Fraction(0)
-        progress_per_model = Fraction(1, progress_dict["models"])
-        progress_per_shift = Fraction(1, max(1, self.shifts))
-        progress += progress_per_model * progress_dict["model_idx_in_bag"]
-        progress_model = Fraction(0)
-        progress_model += progress_per_shift * progress_dict["shift_idx"]
-        progress_shift = Fraction(progress_dict["segment_offset"], progress_dict["audio_length"])
-        if progress_dict["state"] == "end":
-            progress_shift += Fraction(
-                int(self.segment * (1 - self.overlap) * self.separator.samplerate), progress_dict["audio_length"]
-            )
-        progress_shift = min(Fraction(1, 1), progress_shift)
-        progress_model += progress_per_shift * progress_shift
-        progress += progress_model * progress_per_model
-        progress *= Fraction(1, self.in_length)
-        progress += Fraction(self.out_length, self.in_length)
-        current_time = time.time()
-        self.time_hists.append((current_time, progress))
-        if current_time - self.last_update_eta > 0.5:
-            while len(self.time_hists) >= 20 and current_time - self.time_hists[0][0] > 15:
-                self.time_hists.pop(0)
-            if len(self.time_hists) >= 2 and progress != self.time_hists[0][1]:
-                eta = int((1 - progress) / (progress - self.time_hists[0][1]) * (current_time - self.time_hists[0][0]))
-            else:
-                eta = 1000000000
-            if eta >= 99 * 86400:
-                eta_str = "--:--:--:--"
-            elif eta >= 86400:
-                eta_str = "%d:" % (eta // 86400)
-                eta %= 86400
-                eta_str += time.strftime("%H:%M:%S", time.gmtime(eta))
-            else:
-                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
-            self.updateStatus("Separating audio: %s | ETA %s" % (self.file.name, eta_str))
-            self.last_update_eta = current_time
-        pause_start = time.time()
-        self.setModelProgress(min(1.0, float(progress_shift)))
-        self.setAudioProgress(min(1.0, float(progress)), self.item)
-        pause_end = time.time()
-        self.time_hists = [(i[0] + pause_end - pause_start, i[1]) for i in self.time_hists]
-
-    def save_callback(self, *args, encoder="sndfile"):
-        match encoder:
-            case "sndfile":
-                return audio.save_audio_sndfile(*args, self.separator.samplerate, self.updateStatus)
-            case "ffmpeg":
-                return audio.save_audio_ffmpeg(*args, self.separator.samplerate, self.updateStatus)
 
     @shared.thread_wrapper(daemon=True)
     def separate(
         self,
         file,
         item,
+        gain,
         segment,
         overlap,
         shifts,
@@ -474,7 +544,7 @@ class Separator:
             used_xpu = True
         try:
             setStatus(shared.FileStatus.Reading, item)
-            wav, tags = audio.read_audio(file, self.separator.model.samplerate, self.updateStatus)
+            wav, tags = audio.read_audio(file, self.samplerate, updateStatus)
             assert wav is not None
             assert (np.isnan(wav).sum() == 0) and (np.isinf(wav).sum() == 0), "Audio contains NaN or Inf"
         except Exception:
@@ -494,8 +564,10 @@ class Separator:
 
         self.separator.model.to("cpu")  # To avoid moving between different GPUs which may cause error
 
+        wav = audio.gain(wav, gain)
+
         try:
-            self.updateStatus("Separating audio: %s" % file.name)
+            updateStatus("Separating audio: %s" % file.name)
             self.separator.update_parameter(
                 device=device, segment=segment, shifts=shifts, overlap=overlap, callback=self.updateProgress
             )
@@ -533,3 +605,133 @@ class Separator:
         save_callback(file, wav_torch, out, tags, self.save_callback, item, finishCallback)
         self.separating = False
         return
+
+
+class ApolloEnhancer(SeparatorModelBase):
+    model_type = "Apollo"
+    model_description = (
+        "Apollo audio restoration, specified for enhancing audio quality compressed by lossy MP3 codec\n"
+        "See https://github.com/JusperLee/Apollo for more information"
+    )
+    required_modules = ["ApolloCall"]
+
+    def loadModel(self, model: str = "apollo", repo: tp.Optional[pathlib.Path] = None):
+        self.separator = ApolloCall.Enhancer(model=model, repo=repo)
+        self.samplerate = self.separator.samplerate
+        self.default_segment = 10
+        self.max_segment = 3600
+        self.sources = ["enhanced"]
+        self.name = model
+        self.repo = repo
+
+    def listModels(self):
+        custom_repo = shared.GetSetting("custom_repo", [])
+        repos = [shared.homeDir / "pretrained", shared.pretrained]
+        repos += [pathlib.Path(i) for i in custom_repo]
+        models = []
+        infos = []
+        each_repos = []
+        for repo in repos:
+            if repo is not None and not repo.exists():
+                continue
+            try:
+                new_models = ApolloCall.list_models(repo)
+            except Exception:
+                logging.error("Failed to list apollo models from %s:\n%s" % (str(repo), traceback.format_exc()))
+                continue
+            for model in new_models:
+                if (file := (repo / (model + ".bin"))).exists():
+                    pass
+                else:
+                    file = repo / (model + ".ckpt")
+                models.append(model)
+                infos.append("Model: %s\nRepo: %s\nFile: %s" % (model, repo, file))
+                each_repos.append(repo)
+        return models, infos, each_repos
+
+    def modelInfo(self):
+        return "Model: %s\nRepo: %s\nType: %s\n\nSample rate: %d" % (
+            self.name,
+            self.repo,
+            self.separator.__class__.__name__,
+            self.separator.samplerate,
+        )
+
+    @shared.thread_wrapper(daemon=True)
+    def separate(
+        self,
+        file,
+        item,
+        gain,
+        segment,
+        overlap,
+        shifts,
+        device,
+        save_callback,
+        setModelProgress: tp.Callable[[float], None],
+        setAudioProgress: tp.Callable[[float, tp.Any], None],
+        setStatus: tp.Callable[[tp.Any, int], None],
+        finishCallback: tp.Callable[[int, tp.Any], None],
+    ):
+        logging.info("Start separating audio: %s" % file.name)
+        logging.info("Parameters: segment=%.2f overlap=%.2f shifts=%d" % (segment, overlap, shifts))
+        logging.info("Device: %s" % device)
+        global used_cuda, used_xpu
+        if device.startswith("cuda"):
+            used_cuda = True
+        if device.startswith("xpu"):
+            used_xpu = True
+        try:
+            setStatus(shared.FileStatus.Reading, item)
+            wav, tags = audio.read_audio(file, self.samplerate, updateStatus)
+            assert wav is not None
+            assert (np.isnan(wav).sum() == 0) and (np.isinf(wav).sum() == 0), "Audio contains NaN or Inf"
+        except Exception:
+            finishCallback(shared.FileStatus.Failed, item)
+            self.separating = False
+            return
+
+        self.item = item
+        self.shifts = shifts
+        self.segment = segment
+        self.overlap = overlap
+        self.setAudioProgress = setAudioProgress
+        self.setModelProgress = setModelProgress
+        self.file = file
+        self.time_hists = []
+        self.last_update_eta = 0
+
+        wav = audio.gain(wav, gain)
+
+        self.separator.model.to("cpu")  # To avoid moving between different GPUs which may cause error
+
+        try:
+            updateStatus("Enhancing audio: %s" % file.name)
+            self.separator.update_parameter(
+                device=device, segment=segment, shifts=shifts, overlap=overlap, callback=self.updateProgress
+            )
+            wav_torch = torch.from_numpy(wav).clone().transpose(0, 1)
+            assert (not wav_torch.isnan().any()) and (not wav_torch.isinf().any()), "Audio contains NaN or Inf"
+            logging.info("Running Enhancement...")
+            self.time_hists.append((time.time(), 0))
+            self.in_length = 1
+            self.out_length = 0
+            out = self.separator.enhance_tensor(wav_torch)[1]
+        except KeyboardInterrupt:
+            finishCallback(shared.FileStatus.Cancelled, item)
+            self.separating = False
+            return
+        except Exception:
+            logging.error(traceback.format_exc())
+            finishCallback(shared.FileStatus.Failed, item)
+            self.separating = False
+            return
+        finally:
+            self.separator.model.to("cpu")
+        logging.info("Saving enhanced audio...")
+        save_callback(file, wav_torch, {"enhanced": out.squeeze()}, tags, self.save_callback, item, finishCallback)
+        self.separating = False
+        return
+
+
+available_model_types = [DemucsSeparator, ApolloEnhancer]
