@@ -69,57 +69,16 @@ Please refer to [history.md](history.md).
 FFmpeg is a supported audio reader of Demucs-GUI. Demucs-GUI will try to use FFmpeg as long as it is found in the `PATH` environment variable. Both FFmpeg and FFprobe are required. You can install it from source, use system package manager, download prebuilt binaries or use conda (recommended).
 
 ### CPU only on Windows or Apple MPS or CUDA on Linux
-1. Install Python and git. It's recommended to use a virtual environment like conda.
+1. It is recommended to use the uv virtual environment to facilitate the deployment of the corresponding PyTorch Compute Platform.
 2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
 3. Use pip to install all packages in [requirements.txt](requirements.txt).
 
-note: on Linux, PyTorch **with** CUDA is the default.
 ```bash
-# For pip
-pip install -r requirements_cuda.txt
-# Conda is not available as this project has dependencies only on PyPI
+# For uv
+uv pip install -r requirements.txt --torch-backend=auto
 ```
 4. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song!
 
-### CUDA acceleration (Windows only)
-1. Install Python and git. It's recommended to use a virtual environment like conda.
-2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-3. *Skip this step if you don't need to switch the default version of PyTorch.* Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally). There is no requirement of cuda version, but the version of torch should be 2.0.x (2.1.0 and higher will cause errors sometimes)
-4. Use pip to install all packages in [requirements_cuda.txt](requirements_cuda.txt).
-```bash
-# For pip
-pip install -r requirements_cuda.txt
-# Conda is not available as this project has dependencies only on PyPI
-```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
-
-### Accelerate with AMD GPU (Linux only)
-1. Install Python and git. It's recommended to use a virtual environment like conda.
-2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-3. *Skip this step if you don't need to switch the default version of PyTorch.* Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally). There is no requirement of cuda version, but the version of torch should be 2.0.x (2.1.0 and higher will cause errors sometimes)
-4. Use pip to install all packages in [requirements_rocm.txt](requirements_rocm.txt).
-```bash
-# For pip
-pip install -r requirements_rocm.txt
-# Conda is not available as this project has dependencies only on PyPI
-```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
-
-### Accelerate with Intel GPU
-
-**Make sure that you have discrete Intel graphics card or an Intel CPU that is 11th generation or newer with integrated graphics card** (Because we need its driver)
-
-1. Install latest Intel graphics driver ([Windows link](https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html)). This accelerator requires Intel® Arc™ & Iris® Xe Graphics driver (which means, Intel® Arc™ A-Series Graphics, Intel® Iris® Xe Graphics, and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics). Though I would discourage you to use this "accelerator" with integrated graphics card as it may even slower than pure CPU sometimes.
-2. Install Python and git. It's recommended to use a virtual environment like conda.
-3. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-4. Use pip to install all packages in [requirements_intel_gpu_mkl.txt](requirements_intel_gpu_mkl.txt).
-```bash
-# For pip
-pip install -r requirements_intel_gpu_mkl.txt
-# Conda is not available as this project has dependencies only on PyPI
-```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
-6. If it could not start up and sometimes raises an error like `OSError: [WinError 126] Error loading "***\torch\lib\backend_with_compiler.dll" or one of its dependencies`, you may have to manually download libuv and put it in the folder `torch\lib` under your python site packages installation path. One easier way to solve this if you are using conda environment is to run `conda install conda-forge::libuv`.
 
 ## Acknowledgements
 This project includes code of [Demucs](https://github.com/adefossez/demucs) under MIT license.
